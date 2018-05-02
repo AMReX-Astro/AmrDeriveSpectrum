@@ -21,3 +21,5 @@ $ ./AmrDeriveSpectrum3d.gnu.MPI.ex input_spectrum3d
 $ paste -d ' ' x_vel_spectrum_dw.dat y_vel_spectrum_dw.dat z_vel_spectrum_dw.dat > all_spectrum.dat
 $ python spectra.py
 ```
+
+For license information, see the included file `OpenSource.txt`.
