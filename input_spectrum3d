@@ -1,0 +1,36 @@
+##-----------------------------------------------------------
+## INPUT PARAMETERS FOR AMRDERIVESPECTRUM PROBLEM
+##-----------------------------------------------------------
+
+# Verbose flag
+verbose = 1
+
+# List of input plotfiles to process
+infile = wd_4lev_Tc3e8_rhoc3-5e9_plt02665
+
+# Variables to read from the input plotfiles
+vars = x_vel y_vel z_vel
+
+# Flag determining whether div_free
+div_free = 0
+
+# Flag determining whether or not to transpose spatial indices
+transpose_dp = 0
+
+# Flag sets whether or not to weight by density^(1/3)
+density_weighting = 1
+
+density = density
+
+# Flag determining whether or not to read a list of
+# wavenumbers to filter on.
+do_filter = 0
+
+# List of wavenumbers to filter on
+# filterWN = 0.0 0.0 0.0
+
+# This sets the finest level to do the FFT
+finestLevel = 4
+
+# This also sets the finest level to do the FFT
+maxlevel = 4
