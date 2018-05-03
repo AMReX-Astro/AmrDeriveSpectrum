@@ -61,12 +61,12 @@ int main (int argc, char* argv[])
     ParmParse pp;
 
     if (ParallelDescriptor::IOProcessor()) 
-      std::cout<<"getting started"<<std::endl;
+      std::cout << "getting started" << std::endl;
 
     verbose=0;
     pp.query("verbose",verbose);
     if (ParallelDescriptor::IOProcessor()) 
-      std::cout<<"setting verbose = "<<verbose<<std::endl;
+      std::cout << "setting verbose = " << verbose << std::endl;
 
     int nPlotFiles(pp.countval("infile"));
     if(nPlotFiles <= 0) {
@@ -81,8 +81,8 @@ int main (int argc, char* argv[])
       pp.get("infile", plotFileNames[iPlot], iPlot);
     }
     if (ParallelDescriptor::IOProcessor()){ 
-      std::cout<<"number of plotfiles  = "<<nPlotFiles<<std::endl;
-      std::cout<<"first infile = "<<plotFileNames[0]<<std::endl;
+      std::cout << "number of plotfiles  = " << nPlotFiles << std::endl;
+      std::cout << "first infile = " << plotFileNames[0] << std::endl;
     }
 
     nVars=pp.countval("vars");
@@ -191,7 +191,7 @@ int main (int argc, char* argv[])
       if (finestLevelIn>=0 && finestLevelIn<finestLevel) {
 	finestLevel=finestLevelIn;
 	if (ParallelDescriptor::IOProcessor())
-	  std::cout << "Using finestLevel = " << finestLevel <<std::endl;
+	  std::cout << "Using finestLevel = " << finestLevel << std::endl;
       }
 
     int toLevel(1);
