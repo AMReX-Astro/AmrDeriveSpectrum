@@ -17,6 +17,9 @@ int  div_free;
 int  transpose_dp;
 int  density_weighting;
 
+int  use_cutoff_density;
+Real cutoff_density;
+
 int  BLix, BLjx, BLkx;
 int  FTix, FTjx, FTkx;
 int  FTis, FTjs, FTks;

@@ -35,6 +35,8 @@
 // vars = [list of variables to load]
 // div_free = 0 or 1
 // density_weighting = 0 or 1
+// use_cutoff_density = 0 or 1
+// cutoff_density = density below which to zero velocities.
 // transpose_dp = 0 or 1
 // density
 // do_filter = 0 or 1
@@ -98,6 +100,12 @@ int main (int argc, char* argv[])
 
     transpose_dp=1;
     pp.query("transpose_dp",transpose_dp);
+
+	use_cutoff_density=0;
+	pp.query("use_cutoff_density",use_cutoff_density);
+
+	cutoff_density=0.0;
+	pp.query("cutoff_density",cutoff_density);
 
     density_weighting=0;
     pp.query("density_weighting",density_weighting);
@@ -292,25 +300,26 @@ int main (int argc, char* argv[])
 
 	amrData.FillVar(mf, finestLevel, whichVar, destFills);
 
-	/*
-	for(MFIter ntmfi(mf); ntmfi.isValid(); ++ntmfi) {  // --- convert to velocities
-	  Real denTemp;
-	  FArrayBox &myFab = mf[ntmfi];
-	  int XVEL(0), YVEL(1), ZVEL(2), DEN(3);
-	  for(int ni(XVEL); ni <= ZVEL; ++ni) {
-		//zCount = 0;
-		for(int n(0); n < myFab.box().numPts(); ++n) {
-		  denTemp = myFab.dataPtr(DEN)[n];
-		  if(denTemp < 0.00001) {
-			myFab.dataPtr(ni)[n] = 0.0;
-			//++zCount;
-		  } else {
-			myFab.dataPtr(ni)[n] /= denTemp;
+	//
+	// Zero velocity components if density < density_lower_bound
+	//
+	if (use_cutoff_density) {
+
+	  for (MFIter ntmfi(mf); ntmfi.isValid(); ++ntmfi) {
+		Real denTemp;
+		FArrayBox &myFab = mf[ntmfi];
+		int XVEL(0), YVEL(1), ZVEL(2), DEN(3);
+
+		for (int ni(XVEL); ni <= ZVEL; ++ni) {
+
+		  for (int n(0); n < myFab.box().numPts(); ++n) {
+			denTemp = myFab.dataPtr(DEN)[n];
+			if (denTemp < cutoff_density)
+			  myFab.dataPtr(ni)[n] = 0.0;
 		  }
 		}
 	  }
 	}
-	*/
 
     for (int n=0; n<nVars+density_weighting; n++)
 	  amrData.FlushGrids(amrData.StateNumber(whichVar[n]));
