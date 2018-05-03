@@ -172,7 +172,7 @@ int main (int argc, char* argv[])
 
       infile=plotFileNames[iPlot];
       if (ParallelDescriptor::IOProcessor())
-		std::cout << "working on " << plotFileNames[iPlot] <<std::endl;
+		std::cout << "working on " << plotFileNames[iPlot] << std::endl;
 
       /* from Spherical polars
 	  DataServices dataServices(infile, fileType);
