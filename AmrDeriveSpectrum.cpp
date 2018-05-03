@@ -109,18 +109,21 @@ int main (int argc, char* argv[])
     whichVar.resize(nVars+density_weighting);
     if (ParallelDescriptor::IOProcessor())
 	std::cout << "vars = ";
+
     for (int i=0; i<nVars; i++) {
-	pp.get("vars",whichVar[i],i);
-	if (ParallelDescriptor::IOProcessor())
+	  pp.get("vars",whichVar[i],i);
+	  if (ParallelDescriptor::IOProcessor())
 	    std::cout << " " << whichVar[i];
     }
+
     if (density_weighting) {
-	pp.get("density",whichVar[nVars]);
-	if (ParallelDescriptor::IOProcessor())
+	  pp.get("density",whichVar[nVars]);
+	  if (ParallelDescriptor::IOProcessor())
 	    std::cout << " " << whichVar[nVars];
     }
+
     if (ParallelDescriptor::IOProcessor())
-	std::cout << std::endl;
+	  std::cout << std::endl;
 
     Vector<int> destFills(nVars+density_weighting);
     for (int c=0; c<nVars+density_weighting; c++ ) destFills[c] = c;
@@ -143,16 +146,16 @@ int main (int argc, char* argv[])
     local_data_c.resize(nVars);
 
     if (ParallelDescriptor::IOProcessor())
-	std::cout << std::endl;
+	  std::cout << std::endl;
 
     pp.query("do_filter",do_filter);
     if (do_filter) {
       nFilters=pp.countval("filterWN");
       filterWN.resize(nFilters);
       for (int i=0; i<nFilters; i++)
-	pp.get("filterWN",filterWN[i],i);
+		pp.get("filterWN",filterWN[i],i);
       if (ParallelDescriptor::IOProcessor())
-	std::cout << "Filtering on wavenumber(s)..." << std::endl;
+		std::cout << "Filtering on wavenumber(s)..." << std::endl;
     }
     
     //
@@ -165,17 +168,18 @@ int main (int argc, char* argv[])
 
       // initialize sum to zero
       for (int iVar=0; iVar<nVars; iVar++)
-	sum[iVar]=sum2[iVar]=0.;
+		sum[iVar]=sum2[iVar]=0.;
 
       infile=plotFileNames[iPlot];
       if (ParallelDescriptor::IOProcessor())
-	std::cout << "working on " << plotFileNames[iPlot] <<std::endl;
+		std::cout << "working on " << plotFileNames[iPlot] <<std::endl;
 
       /* from Spherical polars
-        DataServices dataServices(infile, fileType);
+	  DataServices dataServices(infile, fileType);
 
-        AmrData& amrData = dataServices.AmrDataRef();
-*/
+	  AmrData& amrData = dataServices.AmrDataRef();
+	  */
+
       DataServices *dataServices = new DataServices(infile, fileType);
       if( ! dataServices->AmrDataOk())
       	DataServices::Dispatch(DataServices::ExitRequest, NULL);
@@ -189,9 +193,9 @@ int main (int argc, char* argv[])
       int finestLevelIn(-1);
       pp.query("finestLevel",finestLevelIn);
       if (finestLevelIn>=0 && finestLevelIn<finestLevel) {
-	finestLevel=finestLevelIn;
-	if (ParallelDescriptor::IOProcessor())
-	  std::cout << "Using finestLevel = " << finestLevel << std::endl;
+		finestLevel=finestLevelIn;
+		if (ParallelDescriptor::IOProcessor())
+		  std::cout << "Using finestLevel = " << finestLevel << std::endl;
       }
 
     int toLevel(1);
@@ -201,209 +205,219 @@ int main (int argc, char* argv[])
 
     Box probDomain(amrData.ProbDomain()[finestLevel]);
 
-      // Set AMReX and FourierTranform array sizes
-      // Note this defaults to a transposition
-      BLix = FTkx = probDomain.length(XDIR);
-      BLjx = FTjx = probDomain.length(YDIR);
-      BLkx = FTix = probDomain.length(ZDIR);
+	// Set AMReX and FourierTranform array sizes
+	// Note this defaults to a transposition
+	BLix = FTkx = probDomain.length(XDIR);
+	BLjx = FTjx = probDomain.length(YDIR);
+	BLkx = FTix = probDomain.length(ZDIR);
 
-      // Figure out the maximum length and wavenumber scaling factors for non-cubic domains
-      FTmx = FTix;    if (FTjx>FTmx) FTmx=FTjx;    if (FTkx>FTmx) FTmx=FTkx;
-      FTis = FTmx/FTix;    FTjs = FTmx/FTjx;    FTks = FTmx/FTkx;
+	// Figure out the maximum length and wavenumber scaling factors for non-cubic domains
+	FTmx = FTix;
+	if (FTjx>FTmx) FTmx=FTjx;
+	if (FTkx>FTmx) FTmx=FTkx;
 
-      // Half kx+1 - accounts for the fftw padding
-      FThkxpo = FTkx/2+1;
+	FTis = FTmx/FTix;
+	FTjs = FTmx/FTjx;
+	FTks = FTmx/FTkx;
 
-      // Number of wavenumbers in the spectra
-      wavenumbers = FTmx/2;
+	// Half kx+1 - accounts for the fftw padding
+	FThkxpo = FTkx/2+1;
 
-      // Size of correlation functions
-      Qix = BLix/2;    Qjx = BLjx/2;    Qkx = BLkx/2;
+	// Number of wavenumbers in the spectra
+	wavenumbers = FTmx/2;
 
-      // Declare memory for spectra (plus one for counting hits)
-      for (int iVar=0; iVar<=nVars; iVar++) {
-	spectrum[iVar]=(Real*)malloc(sizeof(Real)*wavenumbers);
-	for (int wn=0; wn<wavenumbers; wn++)
-	  spectrum[iVar][wn] = 0.0;
-      }
-      if (div_free) {
-	for (int iVar=0; iVar<nVars; iVar++) {
-	  spectrumS[iVar]=(Real*)malloc(sizeof(Real)*wavenumbers);
-	  spectrumC[iVar]=(Real*)malloc(sizeof(Real)*wavenumbers);
-	  for (int wn=0; wn<wavenumbers; wn++) {
-	    spectrumS[iVar][wn] = 0.0;
-	    spectrumC[iVar][wn] = 0.0;
+	// Size of correlation functions
+	Qix = BLix/2;
+	Qjx = BLjx/2;
+	Qkx = BLkx/2;
+
+	// Declare memory for spectra (plus one for counting hits)
+	for (int iVar=0; iVar<=nVars; iVar++) {
+	  spectrum[iVar]=(Real*)malloc(sizeof(Real)*wavenumbers);
+	  for (int wn=0; wn<wavenumbers; wn++)
+		spectrum[iVar][wn] = 0.0;
+	}
+
+	if (div_free) {
+	  for (int iVar=0; iVar<nVars; iVar++) {
+		spectrumS[iVar]=(Real*)malloc(sizeof(Real)*wavenumbers);
+		spectrumC[iVar]=(Real*)malloc(sizeof(Real)*wavenumbers);
+		for (int wn=0; wn<wavenumbers; wn++) {
+		  spectrumS[iVar][wn] = 0.0;
+		  spectrumC[iVar][wn] = 0.0;
+		}
 	  }
 	}
-      }
-      // Declare memory for correlation functions
-      // Qx, Qy and Qz are the correlations in the three directions
-      for (int iVar=0; iVar<nVars; iVar++) {
-	Qx[iVar]=(Real*)malloc(sizeof(Real)*Qix);    for (int i=0; i<Qix; i++)    Qx[iVar][i] = 0.0;
-	Qy[iVar]=(Real*)malloc(sizeof(Real)*Qjx);    for (int j=0; j<Qjx; j++)    Qy[iVar][j] = 0.0;
-	Qz[iVar]=(Real*)malloc(sizeof(Real)*Qkx);    for (int k=0; k<Qkx; k++)    Qz[iVar][k] = 0.0;
-      }
 
-      // Other AMReX stuff
-      probLo=amrData.ProbLo();
-      probHi=amrData.ProbHi();
+	// Declare memory for correlation functions
+	// Qx, Qy and Qz are the correlations in the three directions
+	for (int iVar=0; iVar<nVars; iVar++) {
+	  Qx[iVar]=(Real*)malloc(sizeof(Real)*Qix);    for (int i=0; i<Qix; i++)    Qx[iVar][i] = 0.0;
+	  Qy[iVar]=(Real*)malloc(sizeof(Real)*Qjx);    for (int j=0; j<Qjx; j++)    Qy[iVar][j] = 0.0;
+	  Qz[iVar]=(Real*)malloc(sizeof(Real)*Qkx);    for (int k=0; k<Qkx; k++)    Qz[iVar][k] = 0.0;
+	}
 
-      Lx = probHi[0]-probLo[0];  Ly = probHi[0]-probLo[0];  Lz = probHi[0]-probLo[0];
-      dx = Lx/(Real)BLix;        dy = Ly/(Real)BLjx;        dz = Lz/(Real)BLkx;
-      Real dxyz=dx*dy*dz;
+	// Other AMReX stuff
+	probLo=amrData.ProbLo();
+	probHi=amrData.ProbHi();
 
-      //
-      // Plan ffts and make boxes, distribution etc.
-      //
-      BoxArray   domainBoxArray(nProcs);
-      Vector<int> pmap(nProcs+1);
+	Lx = probHi[0]-probLo[0];
+	Ly = probHi[0]-probLo[0];
+	Lz = probHi[0]-probLo[0];
 
-      plan_ffts(probDomain,domainBoxArray,pmap);
+	dx = Lx/(Real)BLix;
+	dy = Ly/(Real)BLjx;
+	dz = Lz/(Real)BLkx;
 
+	Real dxyz=dx*dy*dz;
 
-      DistributionMapping domainDistMap(pmap);
+	//
+	// Plan ffts and make boxes, distribution etc.
+	//
+	BoxArray   domainBoxArray(nProcs);
+	Vector<int> pmap(nProcs+1);
 
-      //
-      // Load plot file into prescribed data structure
-      // 
-      int ngrow(0);
-      MultiFab mf;
-      mf.define(domainBoxArray, domainDistMap, nVars+density_weighting, ngrow, MFInfo().SetAlloc(true));
+	plan_ffts(probDomain,domainBoxArray,pmap);
 
-      Real timer_start = ParallelDescriptor::second();
+	DistributionMapping domainDistMap(pmap);
 
-      amrData.FillVar(mf, finestLevel, whichVar, destFills);
+	//
+	// Load plot file into prescribed data structure
+	// 
+	int ngrow(0);
+	MultiFab mf;
+	mf.define(domainBoxArray, domainDistMap, nVars+density_weighting, ngrow, MFInfo().SetAlloc(true));
 
+	Real timer_start = ParallelDescriptor::second();
 
-  // ========
-//     for(MFIter ntmfi(mf); ntmfi.isValid(); ++ntmfi) {  // --- convert to velocities
-//       Real denTemp;
-//       FArrayBox &myFab = mf[ntmfi];
-//       int XVEL(0), YVEL(1), ZVEL(2), DEN(3);
-//       for(int ni(XVEL); ni <= ZVEL; ++ni) {
-//         //zCount = 0;
-//         for(int n(0); n < myFab.box().numPts(); ++n) {
-//           denTemp = myFab.dataPtr(DEN)[n];
-//           if(denTemp < 0.00001) {
-//             myFab.dataPtr(ni)[n] = 0.0;
-//             //++zCount;
-//           } else {
-//             myFab.dataPtr(ni)[n] /= denTemp;
-//           }
-//         }
-//       }
-//     }
-  // ========
+	amrData.FillVar(mf, finestLevel, whichVar, destFills);
+
+	/*
+	for(MFIter ntmfi(mf); ntmfi.isValid(); ++ntmfi) {  // --- convert to velocities
+	  Real denTemp;
+	  FArrayBox &myFab = mf[ntmfi];
+	  int XVEL(0), YVEL(1), ZVEL(2), DEN(3);
+	  for(int ni(XVEL); ni <= ZVEL; ++ni) {
+		//zCount = 0;
+		for(int n(0); n < myFab.box().numPts(); ++n) {
+		  denTemp = myFab.dataPtr(DEN)[n];
+		  if(denTemp < 0.00001) {
+			myFab.dataPtr(ni)[n] = 0.0;
+			//++zCount;
+		  } else {
+			myFab.dataPtr(ni)[n] /= denTemp;
+		  }
+		}
+	  }
+	}
+	*/
 
     for (int n=0; n<nVars+density_weighting; n++)
-	amrData.FlushGrids(amrData.StateNumber(whichVar[n]));
+	  amrData.FlushGrids(amrData.StateNumber(whichVar[n]));
 
-      Real timer_stop = ParallelDescriptor::second();
+	Real timer_stop = ParallelDescriptor::second();
 
-      if (ParallelDescriptor::IOProcessor())
-	std::cout << "   ...done (" << timer_stop-timer_start << "s)." << std::endl;
+	if (ParallelDescriptor::IOProcessor())
+	  std::cout << "   ...done (" << timer_stop-timer_start << "s)." << std::endl;
 
-      //
-      // Allocate memory for fftw data
-      //
-      for (int iVar=0; iVar<nVars; iVar++) {
-	local_data[iVar]   = (fftw_real*)    malloc(sizeof(fftw_real) * total_local_size);   if (local_data[iVar] == NULL) amrex::Abort("Malloc fail (local_data)");
-	local_data_c[iVar] = (fftw_complex*) local_data[iVar];
-	for (int i=0; i<total_local_size; i++)
-	  local_data[iVar][i] = 0.;
-      }
+	//
+	// Allocate memory for fftw data
+	//
+	for (int iVar=0; iVar<nVars; iVar++) {
+	  local_data[iVar]   = (fftw_real*)    malloc(sizeof(fftw_real) * total_local_size);   if (local_data[iVar] == NULL) amrex::Abort("Malloc fail (local_data)");
+	  local_data_c[iVar] = (fftw_complex*) local_data[iVar];
+	  for (int i=0; i<total_local_size; i++)
+		local_data[iVar][i] = 0.;
+	}
     
-      //
-      // Evaluate fft
-      //
-      Spectra(mf, probDomain);
+	//
+	// Evaluate fft
+	//
+	Spectra(mf, probDomain);
 
-      if (ParallelDescriptor::IOProcessor()) {
-	std::string suffix;
-	suffix = "";
+	if (ParallelDescriptor::IOProcessor()) {
+	  std::string suffix;
+	  suffix = "";
+	  if (div_free) {
+		if (transpose_dp)
+		  suffix += "_df_tdp";
+		else
+		  suffix += "_df";
+	  }
+	  if (density_weighting)
+		suffix += "_dw";
+	  suffix += ".dat";
+
+	  std::cout << "Outputting to file..." << std::endl;
+	  for (int iVar=0; iVar<=nVars; iVar++) {
+		std::string outfile;
+		if (iVar==nVars)
+		  outfile = infile + "/spectrum_count" + suffix;
+		else
+		  outfile = infile + "/" + whichVar[iVar] + "_spectrum" + suffix;
+		FILE* file=fopen(outfile.c_str(),"w");
+		for (int wn=0; wn<wavenumbers; wn++)
+		  if (div_free)
+			fprintf(file,"%i %e %e %e\n",wn,spectrum[iVar][wn],spectrumS[iVar][wn],spectrumC[iVar][wn]);
+		  else
+			fprintf(file,"%i %e\n",wn,spectrum[iVar][wn]);
+		fclose(file);
+	  }
+	  for (int iVar=0; iVar<nVars; iVar++) {
+		std::string outfile;
+		FILE* file;
+
+		// Integrals
+		outfile = infile + "/" + whichVar[iVar] + "_Int" + suffix;
+		file=fopen(outfile.c_str(),"w");
+		fprintf(file,"%e %e %e\n",Time,sum[iVar]*dxyz,sum2[iVar]*dxyz);
+		fclose(file);
+
+		// Qx
+		outfile = infile + "/" + whichVar[iVar] + "_Qx" + suffix;
+		file=fopen(outfile.c_str(),"w");
+		for (int i=0; i<Qix; i++)
+		  fprintf(file,"%e %e\n",dx*(0.5+(Real)i),Qx[iVar][i]);
+		fclose(file);
+
+		// Qy
+		outfile = infile + "/" + whichVar[iVar] + "_Qy" + suffix;
+		file=fopen(outfile.c_str(),"w");
+		for (int i=0; i<Qjx; i++)
+		  fprintf(file,"%e %e\n",dy*(0.5+(Real)i),Qy[iVar][i]);
+		fclose(file);
+
+		// Qz
+		outfile = infile + "/" + whichVar[iVar] + "_Qz" + suffix;
+		file=fopen(outfile.c_str(),"w");
+		for (int i=0; i<Qkx; i++)
+		  fprintf(file,"%e %e\n",dz*(0.5+(Real)i),Qz[iVar][i]);
+		fclose(file);
+	  }
+	  std::cout << "   ...done." << std::endl;
+	}
+
+	rfftwnd_mpi_destroy_plan(plan_real2cplx);
+	rfftwnd_mpi_destroy_plan(plan_cplx2real);
+
+	for (int iVar=0; iVar<nVars; iVar++) {
+	  free(local_data[iVar]);
+	  free(Qx[iVar]);
+	  free(Qy[iVar]);
+	  free(Qz[iVar]);
+	  free(spectrum[iVar]);
+	}
 	if (div_free) {
-	  if (transpose_dp)
-	    suffix += "_df_tdp";
-	  else
-	    suffix += "_df";
+	  for (int iVar=0; iVar<nVars; iVar++) {
+		free(spectrumS[iVar]);
+		free(spectrumC[iVar]);
+	  }
 	}
-	if (density_weighting)
-	  suffix += "_dw";
-	suffix += ".dat";
-
-	std::cout << "Outputting to file..." << std::endl;
-	for (int iVar=0; iVar<=nVars; iVar++) {
-	  std::string outfile;
-	  if (iVar==nVars)
-	    outfile = infile + "/spectrum_count" + suffix;
-	  else
-	    outfile = infile + "/" + whichVar[iVar] + "_spectrum" + suffix;
-	  FILE* file=fopen(outfile.c_str(),"w");
-	  for (int wn=0; wn<wavenumbers; wn++)
-	    if (div_free)
-	      fprintf(file,"%i %e %e %e\n",wn,spectrum[iVar][wn],spectrumS[iVar][wn],spectrumC[iVar][wn]);
-	    else
-	      fprintf(file,"%i %e\n",wn,spectrum[iVar][wn]);
-	  fclose(file);
-	}
-	for (int iVar=0; iVar<nVars; iVar++) {
-	  std::string outfile;
-	  FILE* file;
-	  // Integrals
-	  outfile = infile + "/" + whichVar[iVar] + "_Int" + suffix;
-	  file=fopen(outfile.c_str(),"w");
-	  fprintf(file,"%e %e %e\n",Time,sum[iVar]*dxyz,sum2[iVar]*dxyz);
-	  fclose(file);
-	  // Qx
-	  outfile = infile + "/" + whichVar[iVar] + "_Qx" + suffix;
-	  file=fopen(outfile.c_str(),"w");
-	  for (int i=0; i<Qix; i++)
-	    fprintf(file,"%e %e\n",dx*(0.5+(Real)i),Qx[iVar][i]);
-	  fclose(file);
-	  // Qy
-	  outfile = infile + "/" + whichVar[iVar] + "_Qy" + suffix;
-	  file=fopen(outfile.c_str(),"w");
-	  for (int i=0; i<Qjx; i++)
-	    fprintf(file,"%e %e\n",dy*(0.5+(Real)i),Qy[iVar][i]);
-	  fclose(file);
-	  // Qz
-	  outfile = infile + "/" + whichVar[iVar] + "_Qz" + suffix;
-	  file=fopen(outfile.c_str(),"w");
-	  for (int i=0; i<Qkx; i++)
-	    fprintf(file,"%e %e\n",dz*(0.5+(Real)i),Qz[iVar][i]);
-	  fclose(file);
-	}
-	std::cout << "   ...done." << std::endl;
-      }
-
-      rfftwnd_mpi_destroy_plan(plan_real2cplx);
-      rfftwnd_mpi_destroy_plan(plan_cplx2real);
-
-      for (int iVar=0; iVar<nVars; iVar++) {
-	free(local_data[iVar]);
-	free(Qx[iVar]);
-	free(Qy[iVar]);
-	free(Qz[iVar]);
-	free(spectrum[iVar]);
-      }
-      if (div_free) {
-	for (int iVar=0; iVar<nVars; iVar++) {
-	  free(spectrumS[iVar]);
-	  free(spectrumC[iVar]);
-	}
-      }
 
     } // iPlot
 
     amrex::Finalize();
- }
-
-
-
-
-
-
-
+}
 
 
 
@@ -411,23 +425,19 @@ int main (int argc, char* argv[])
 
 void Spectra(MultiFab &mf, Box &probDomain)
 {  
-    //
-    // Populate fft data
-    //
-    if (ParallelDescriptor::IOProcessor())
+  //
+  // Populate fft data
+  //
+  if (ParallelDescriptor::IOProcessor())
 	std::cout << "Populating fft data..." << std::endl;
 
-    Real timer_start = ParallelDescriptor::second();
+  Real timer_start = ParallelDescriptor::second();
 
-    for(MFIter mfi(mf); mfi.isValid(); ++mfi) {
+  for(MFIter mfi(mf); mfi.isValid(); ++mfi) {
 	const FArrayBox &myFab = mf[mfi];
 	
 	const int  *dlo = myFab.loVect();
 	const int  *dhi = myFab.hiVect();
-
-	//const int   dat_ix = dhi[0] - dlo[0] + 1;
-	//const int   dat_jx = dhi[1] - dlo[1] + 1;
-	//const int   dat_kx = dhi[2] - dlo[2] + 1;
 
 	const Box&  vBox = mfi.validbox();
 	const int  *lo   = vBox.loVect();
@@ -437,114 +447,115 @@ void Spectra(MultiFab &mf, Box &probDomain)
 	const int   mfkx = hi[2] - lo[2] + 1;
 
 	if (verbose>1) {
-	    for (int iProc=0; iProc<nProcs; iProc++) {
+	  for (int iProc=0; iProc<nProcs; iProc++) {
 		if (iProc==myProc) {
-		    std::cout << "--" << '\n'
-			      << "Proc " << iProc << '\n'
-			      << "BLix BLjx BLkx " << BLix << " " << BLjx << " " << BLkx << " " << '\n'
-			      << "FTix FTjx FTkx " << FTix << " " << FTjx << " " << FTkx << " " << '\n'
-			      << "mfix mfjx mfkx " << mfix << " " << mfjx << " " << mfkx << " " << '\n'
-			      << "FTmx " << FTmx << '\n'
-			      << "FTis FTjs FTks " << FTis << " " << FTjs << " " << FTks << " " << '\n'
-			      << "FThkxpo " << FThkxpo << '\n'
-			      << "local_ix local_i_start " << local_ix << " " << local_i_start << '\n'
-			      << "local_jx_after_transpose local_j_start_after_transpose " << local_jx_after_transpose << " " << local_j_start_after_transpose << '\n'
-			      << std::endl;
-		    std::cout.flush();
+		  std::cout << "--" << '\n'
+					<< "Proc " << iProc << '\n'
+					<< "BLix BLjx BLkx " << BLix << " " << BLjx << " " << BLkx << " " << '\n'
+					<< "FTix FTjx FTkx " << FTix << " " << FTjx << " " << FTkx << " " << '\n'
+					<< "mfix mfjx mfkx " << mfix << " " << mfjx << " " << mfkx << " " << '\n'
+					<< "FTmx " << FTmx << '\n'
+					<< "FTis FTjs FTks " << FTis << " " << FTjs << " " << FTks << " " << '\n'
+					<< "FThkxpo " << FThkxpo << '\n'
+					<< "local_ix local_i_start " << local_ix << " " << local_i_start << '\n'
+					<< "local_jx_after_transpose local_j_start_after_transpose " << local_jx_after_transpose << " " << local_j_start_after_transpose << '\n'
+					<< std::endl;
+		  std::cout.flush();
 		}
 		ParallelDescriptor::Barrier();
-	    }
+	  }
 	}
 
 	const Real* density_data;
 	if (density_weighting)
-	    density_data = myFab.dataPtr(nVars);
+	  density_data = myFab.dataPtr(nVars);
 
 	for (int iVar=0; iVar<nVars; iVar++) {
 
-	    const Real* mf_data = myFab.dataPtr(iVar);
+	  const Real* mf_data = myFab.dataPtr(iVar);
 
-	    for (int i=0; i<mfix; i++) {
+	  for (int i=0; i<mfix; i++) {
 		int FTk=i;
 		for (int j=0; j<mfjx; j++) {
-		    int FTj=j;
-		    for (int k=0; k<mfkx; k++) {
+		  int FTj=j;
+		  for (int k=0; k<mfkx; k++) {
 			int FTi=k;
 			int dat_cell=(k*mfjx+j)*mfix+i;
 			int fft_cell=(FTi*FTjx+FTj)*(2*FThkxpo)+FTk;
 			Real val = mf_data[dat_cell];
 			if (density_weighting)
-			    val *= pow(density_data[dat_cell],(1.0/3.0));
+			  val *= pow(density_data[dat_cell],(1.0/3.0));
 			local_data[iVar][fft_cell] = val;
 			sum[iVar]  += val;
 			sum2[iVar] += val*val;
-		    }
+		  }
 		}
-	    }
+	  }
 
 	} // iVar
 
-    } // mfi
-    ParallelDescriptor::ReduceRealSum(sum,nVars,IOProc);
-    ParallelDescriptor::ReduceRealSum(sum2,nVars,IOProc);
+  } // mfi
 
-    Real timer_stop = ParallelDescriptor::second();
+  ParallelDescriptor::ReduceRealSum(sum,nVars,IOProc);
+  ParallelDescriptor::ReduceRealSum(sum2,nVars,IOProc);
 
-    if (ParallelDescriptor::IOProcessor())
+  Real timer_stop = ParallelDescriptor::second();
+
+  if (ParallelDescriptor::IOProcessor())
 	std::cout << "   ...done (" << timer_stop-timer_start << "s)." << std::endl;
 
-    //
-    // Perform transforms
-    //
-    if (ParallelDescriptor::IOProcessor())
+  //
+  // Perform transforms
+  //
+  if (ParallelDescriptor::IOProcessor())
 	std::cout << "Performing real to complex transform..." << std::endl;
 
-    timer_start = ParallelDescriptor::second();
+  timer_start = ParallelDescriptor::second();
 
-    for (int iVar=0; iVar<nVars; iVar++)
+  for (int iVar=0; iVar<nVars; iVar++)
 	rfftwnd_mpi(plan_real2cplx, 1, local_data[iVar], NULL, FFTW_TRANSPOSED_ORDER);
 
-    timer_stop = ParallelDescriptor::second();
+  timer_stop = ParallelDescriptor::second();
 
-    if (ParallelDescriptor::IOProcessor())
+  if (ParallelDescriptor::IOProcessor())
 	std::cout << "   ...done (" << timer_stop-timer_start << "s)." << std::endl;
 
-    if (do_filter) {
-      //
-      // Filter data
-      //
-      if (ParallelDescriptor::IOProcessor())
-	std::cout << "Filtering..." << std::endl;
+  if (do_filter) {
+	//
+	// Filter data
+	//
+	if (ParallelDescriptor::IOProcessor())
+	  std::cout << "Filtering..." << std::endl;
       
-      timer_start = ParallelDescriptor::second();
+	timer_start = ParallelDescriptor::second();
       
-      filter(mf, probDomain);
+	filter(mf, probDomain);
       
-      timer_stop = ParallelDescriptor::second();
+	timer_stop = ParallelDescriptor::second();
       
-      if (ParallelDescriptor::IOProcessor())
-	std::cout << "   ...done (" << timer_stop-timer_start << "s)." << std::endl;
-    }
+	if (ParallelDescriptor::IOProcessor())
+	  std::cout << "   ...done (" << timer_stop-timer_start << "s)." << std::endl;
+  }
 
-    //
-    // Integrate spectra
-    //
-    if (ParallelDescriptor::IOProcessor())
+  //
+  // Integrate spectra
+  //
+  if (ParallelDescriptor::IOProcessor())
 	std::cout << "Evaluating energy spectrum..." << std::endl;
     
-    timer_start = ParallelDescriptor::second();
+  timer_start = ParallelDescriptor::second();
 
-    // Divisor to normalise transform
-    Real div = ((Real)FTix)*((Real)FTjx)*((Real)FTkx);
+  // Divisor to normalise transform
+  Real div = ((Real)FTix)*((Real)FTjx)*((Real)FTkx);
     
-    for (int j=0; j<local_jx_after_transpose; j++) {
+  for (int j=0; j<local_jx_after_transpose; j++) {
 	int jp = j+local_j_start_after_transpose;
 	int jj = FTjx-jp; if (jp<jj) jj = jp; else jj = -jj;
 	jj *= FTjs; // Scale if non-cubic
 	for (int i=0; i<FTix; i++) {
-	    int ii = FTix-i; if (i<ii) ii = i; else ii = -ii;
-	    ii *= FTis; // Scale if non-cubic
-	    for (int k=0; k<FThkxpo; k++) {
+	  int ii = FTix-i; if (i<ii) ii = i; else ii = -ii;
+	  ii *= FTis; // Scale if non-cubic
+	  for (int k=0; k<FThkxpo; k++) {
 		int kk = FTkx-k; if (k<kk) kk = k; else kk = -kk;
 		kk *= FTks; // Scale if non-cubic
 
@@ -601,83 +612,79 @@ void Spectra(MultiFab &mf, Box &probDomain)
 		}
 
 		for (int iVar=0; iVar<nVars; iVar++) {
-		    Real re = local_data_c[iVar][ccell].re/div;
-		    Real im = local_data_c[iVar][ccell].im/div;
-		    Real sq = re*re + im*im;
-		    if (wn<wavenumbers)
+		  Real re = local_data_c[iVar][ccell].re/div;
+		  Real im = local_data_c[iVar][ccell].im/div;
+		  Real sq = re*re + im*im;
+		  if (wn<wavenumbers)
 			spectrum[iVar][wn] += 0.5 * sq;
 
-		    re = local_data_c[iVar][ccell].re = sq;
-		    im = local_data_c[iVar][ccell].im = 0.;
+		  re = local_data_c[iVar][ccell].re = sq;
+		  im = local_data_c[iVar][ccell].im = 0.;
 		}
 		// Let's count the number of hits
 		if (wn<wavenumbers)
-		    spectrum[nVars][wn] += 1;
-	    }
+		  spectrum[nVars][wn] += 1;
+	  }
 	}
-    }
+  }
 
-    for (int iVar=0; iVar<=nVars; iVar++) {
+  for (int iVar=0; iVar<=nVars; iVar++) {
 	ParallelDescriptor::ReduceRealSum(spectrum[iVar],wavenumbers,IOProc);
 	if (div_free) {
 	  ParallelDescriptor::ReduceRealSum(spectrumS[iVar],wavenumbers,IOProc);
 	  ParallelDescriptor::ReduceRealSum(spectrumC[iVar],wavenumbers,IOProc);
 	}
-    }
+  }
 
-    timer_stop = ParallelDescriptor::second();
+  timer_stop = ParallelDescriptor::second();
 
-    if (ParallelDescriptor::IOProcessor())
+  if (ParallelDescriptor::IOProcessor())
 	std::cout << "   ...done (" << timer_stop-timer_start << "s)." << std::endl;
 
-    //
-    // Invert and calculate correlation functions for integral length scale
-    //
+  //
+  // Invert and calculate correlation functions for integral length scale
+  //
 
-    if (ParallelDescriptor::IOProcessor())
+  if (ParallelDescriptor::IOProcessor())
 	std::cout << "Inverting for correlation tensor..." << std::endl;
     
-    timer_start = ParallelDescriptor::second();
+  timer_start = ParallelDescriptor::second();
 
-    for (int iVar=0; iVar<nVars; iVar++)
+  for (int iVar=0; iVar<nVars; iVar++)
 	rfftwnd_mpi(plan_cplx2real, 1, local_data[iVar], NULL, FFTW_TRANSPOSED_ORDER);
 
-    timer_stop = ParallelDescriptor::second();
+  timer_stop = ParallelDescriptor::second();
 
-    if (ParallelDescriptor::IOProcessor())
+  if (ParallelDescriptor::IOProcessor())
 	std::cout << "   ...done (" << timer_stop-timer_start << "s)." << std::endl;
 
-    //
-    // Evaluate x and y correlations on bottom plane, and z correlation on the part of domain we have
-    //
-    // Access fft data through:   int fft_cell=(FTi*FTjx+FTj)*(2*FThkxpo)+FTk;
-    //
-    for (int iVar=0; iVar<nVars; iVar++) {
+  //
+  // Evaluate x and y correlations on bottom plane, and z correlation on the part of domain we have
+  //
+  // Access fft data through:   int fft_cell=(FTi*FTjx+FTj)*(2*FThkxpo)+FTk;
+  //
+  for (int iVar=0; iVar<nVars; iVar++) {
 	if (local_i_start==0) {
-	    // This is the process with the bottom plane (probably proc 0)
-	    // Correlation function in x direction (remember it's the transpose)
-	    for (int i=0; i<Qix; i++)
+	  // This is the process with the bottom plane (probably proc 0)
+	  // Correlation function in x direction (remember it's the transpose)
+	  for (int i=0; i<Qix; i++)
 		Qx[iVar][i] = local_data[iVar][i];
-	    // Correlation function in y direction
-	    for (int j=0; j<Qjx; j++)
+	  // Correlation function in y direction
+	  for (int j=0; j<Qjx; j++)
 		Qy[iVar][j] = local_data[iVar][j*(2*FThkxpo)];
 	}
 	// Correlation function in z direction (remember it's the transpose)
 	// Only do the bit on this processor
 	for (int k=0; ( (k<local_ix) && ((k+local_i_start)<Qkx) ); k++)
-	    Qz[iVar][k+local_i_start] = local_data[iVar][k*FTjx*(2*FThkxpo)];
+	  Qz[iVar][k+local_i_start] = local_data[iVar][k*FTjx*(2*FThkxpo)];
 	
 	// And reduce
 	ParallelDescriptor::ReduceRealSum(Qx[iVar],Qix,IOProc);
 	ParallelDescriptor::ReduceRealSum(Qy[iVar],Qjx,IOProc);
 	ParallelDescriptor::ReduceRealSum(Qz[iVar],Qkx,IOProc);
-    }
+  }
     
 }
-
-
-
-
 
 
 
@@ -685,97 +692,98 @@ void Spectra(MultiFab &mf, Box &probDomain)
 
 void plan_ffts(Box &probDomain, BoxArray &domainBoxArray, Vector<int> &pmap)
 {
-    plan_real2cplx = rfftw3d_mpi_create_plan(MPI_COMM_WORLD,
-					     FTix, FTjx, FTkx,
-					     FFTW_REAL_TO_COMPLEX,
-					     FFTW_ESTIMATE);
+  plan_real2cplx = rfftw3d_mpi_create_plan(MPI_COMM_WORLD,
+										   FTix, FTjx, FTkx,
+										   FFTW_REAL_TO_COMPLEX,
+										   FFTW_ESTIMATE);
   
-    plan_cplx2real = rfftw3d_mpi_create_plan(MPI_COMM_WORLD,
-					     FTix, FTjx, FTkx,
-					     FFTW_COMPLEX_TO_REAL,
-					     FFTW_ESTIMATE);
-    //
-    // FFTW prescribes the data structure
-    //
-    rfftwnd_mpi_local_sizes(plan_real2cplx,
-			    &local_ix, &local_i_start,
-			    &local_jx_after_transpose,
-			    &local_j_start_after_transpose,
-			    &total_local_size);
+  plan_cplx2real = rfftw3d_mpi_create_plan(MPI_COMM_WORLD,
+										   FTix, FTjx, FTkx,
+										   FFTW_COMPLEX_TO_REAL,
+										   FFTW_ESTIMATE);
+  //
+  // FFTW prescribes the data structure
+  //
+  rfftwnd_mpi_local_sizes(plan_real2cplx,
+						  &local_ix, &local_i_start,
+						  &local_jx_after_transpose,
+						  &local_j_start_after_transpose,
+						  &total_local_size);
   
-    if (ParallelDescriptor::IOProcessor())
+  if (ParallelDescriptor::IOProcessor())
 	std::cout << "Total_local_size = " << total_local_size << std::endl;
 
-    //
-    // Collect the gridding
-    // 
-    int local_ix_array[nProcs];
-    int local_i_start_array[nProcs];
+  //
+  // Collect the gridding
+  // 
+  int local_ix_array[nProcs];
+  int local_i_start_array[nProcs];
 
-    for (int iProc=0; iProc<nProcs; iProc++) {
+  for (int iProc=0; iProc<nProcs; iProc++) {
 	if (iProc==myProc) {
-	    local_ix_array[iProc]      = local_ix;
-	    local_i_start_array[iProc] = local_i_start;
+	  local_ix_array[iProc]      = local_ix;
+	  local_i_start_array[iProc] = local_i_start;
 	} else {
-	    local_ix_array[iProc]      = 0;
-	    local_i_start_array[iProc] = 0;
+	  local_ix_array[iProc]      = 0;
+	  local_i_start_array[iProc] = 0;
 	}
-    }
+  }
   
-    ParallelDescriptor::ReduceIntSum(local_ix_array,nProcs,IOProc);
-    ParallelDescriptor::ReduceIntSum(local_i_start_array,nProcs,IOProc); 
+  ParallelDescriptor::ReduceIntSum(local_ix_array,nProcs,IOProc);
+  ParallelDescriptor::ReduceIntSum(local_i_start_array,nProcs,IOProc); 
   
-    if (ParallelDescriptor::IOProcessor()) {
+  if (ParallelDescriptor::IOProcessor()) {
 	local_xlo.resize(nProcs);
 	local_xhi.resize(nProcs);
 	for (int iProc=0; iProc<nProcs; iProc++) {
-	    local_xlo[iProc] = dx*(Real)local_i_start_array[iProc];
-	    local_xhi[iProc] = local_xlo[iProc]+dx*(Real)local_ix_array[iProc];
+	  local_xlo[iProc] = dx*(Real)local_i_start_array[iProc];
+	  local_xhi[iProc] = local_xlo[iProc]+dx*(Real)local_ix_array[iProc];
 	}
 
 	if (verbose>1) {
-	    for (int iProc=0; iProc<nProcs; iProc++) {
+	  for (int iProc=0; iProc<nProcs; iProc++) {
 		std::cout << "Proc " << iProc
-			  << " : local_ix = " << local_ix_array[iProc]
-			  << " : local_i_start = " << local_i_start_array[iProc]
-			  << " : xlo = " << local_xlo[iProc]
-			  << " : xhi = " << local_xhi[iProc]
-			  << std::endl;
-	    }
+				  << " : local_ix = " << local_ix_array[iProc]
+				  << " : local_i_start = " << local_i_start_array[iProc]
+				  << " : xlo = " << local_xlo[iProc]
+				  << " : xhi = " << local_xhi[iProc]
+				  << std::endl;
+	  }
 	}
-    }
+  }
 
-    // Need to make sure box is ok, can have issues
-    // e.g. for 1024^3 on 48 procs, slabs of 21 are insufficient
-    //      but slabs of 22 fit on 47 procs, so the last is empty
-    if (local_ix==0)
-      amrex::Abort("Number of processors doesn't divide domain size (see usage note)");
+  // Need to make sure box is ok, can have issues
+  // e.g. for 1024^3 on 48 procs, slabs of 21 are insufficient
+  //      but slabs of 22 fit on 47 procs, so the last is empty
+  if (local_ix==0)
+	amrex::Abort("Number of processors doesn't divide domain size (see usage note)");
  
-    // Now do the slabs
-    Box        tempBox(probDomain);    
-    Vector<int> tempBoxSmall(nProcs,0);
-    Vector<int> tempBoxBig(nProcs,0);
+  // Now do the slabs
+  Box        tempBox(probDomain);    
+  Vector<int> tempBoxSmall(nProcs,0);
+  Vector<int> tempBoxBig(nProcs,0);
       
-    // When using "AmrDeriveSubdomains" probLo is no longer 0, so let's add it in...
-    tempBoxSmall[myProc] = probDomain.smallEnd(2) + local_i_start;
-    tempBoxBig[myProc]   = probDomain.smallEnd(2) + local_i_start + local_ix - 1;
+  // When using "AmrDeriveSubdomains" probLo is no longer 0, so let's add it in...
+  tempBoxSmall[myProc] = probDomain.smallEnd(2) + local_i_start;
+  tempBoxBig[myProc]   = probDomain.smallEnd(2) + local_i_start + local_ix - 1;
   
 
-    for (int iProc=0; iProc<nProcs; iProc++) {
+  for (int iProc=0; iProc<nProcs; iProc++) {
 	ParallelDescriptor::ReduceIntSum(tempBoxSmall[iProc]);
 	ParallelDescriptor::ReduceIntSum(tempBoxBig[iProc]);
-    }
+  }
 
-    for (int iProc=0; iProc<nProcs; iProc++) {
+  for (int iProc=0; iProc<nProcs; iProc++) {
 	tempBox.setSmall(ZDIR, tempBoxSmall[iProc]);
 	tempBox.setBig(ZDIR, tempBoxBig[iProc]); 
 	domainBoxArray.set(iProc, tempBox);
-    }
+  }
   
-    // And now the distibution mapping
-    for (int iProc=0; iProc<nProcs; iProc++)
+  // And now the distibution mapping
+  for (int iProc=0; iProc<nProcs; iProc++)
 	pmap[iProc] = iProc;
-    pmap[nProcs] = myProc;
+
+  pmap[nProcs] = myProc;
 
 }
 
@@ -783,41 +791,16 @@ void plan_ffts(Box &probDomain, BoxArray &domainBoxArray, Vector<int> &pmap)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 void filter(MultiFab &mf, Box &probDomain)
 {
-   //
+  //
   // Allocate memory for a copy of fftw data
   // Let's do 2 copies for gt and lt threshold wavenumber
   //
   int nFiltVars(2*nVars);
   Vector<fftw_real*>    filtered_data(nFiltVars);
   Vector<fftw_complex*> filtered_data_c(nFiltVars);
+
   for (int iVar=0; iVar<nFiltVars; iVar++) {
     filtered_data[iVar]   = (fftw_real*)    malloc(sizeof(fftw_real) * total_local_size);   if (filtered_data[iVar] == NULL) amrex::Abort("Malloc fail (filtered_data)");
     filtered_data_c[iVar] = (fftw_complex*) filtered_data[iVar];
@@ -844,43 +827,46 @@ void filter(MultiFab &mf, Box &probDomain)
     // Reset data
     for (int iVar=0; iVar<nFiltVars; iVar++) {
       for (int i=0; i<total_local_size; i++)
-	filtered_data[iVar][i] = 0.;
+		filtered_data[iVar][i] = 0.;
     }
     mf.setVal(0.);
     //
     // Filter
     //
     for (int iVar=0; iVar<nVars; iVar++) {
+
       for (int j=0; j<local_jx_after_transpose; j++) {
-	int jp = j+local_j_start_after_transpose;
-	int jj = FTjx-jp; if (jp<jj) jj = jp; else jj = -jj;
-	jj *= FTjs; // Scale if non-cubic
-	for (int i=0; i<FTix; i++) {
-	  int ii = FTix-i; if (i<ii) ii = i; else ii = -ii;
-	  ii *= FTis; // Scale if non-cubic
-	  for (int k=0; k<FThkxpo; k++) {
-	    int kk = FTkx-k; if (k<kk) kk = k; else kk = -kk;
-	    kk *= FTks; // Scale if non-cubic
+		int jp = j+local_j_start_after_transpose;
+		int jj = FTjx-jp; if (jp<jj) jj = jp; else jj = -jj;
+		jj *= FTjs; // Scale if non-cubic
+
+		for (int i=0; i<FTix; i++) {
+		  int ii = FTix-i; if (i<ii) ii = i; else ii = -ii;
+		  ii *= FTis; // Scale if non-cubic
+
+		  for (int k=0; k<FThkxpo; k++) {
+			int kk = FTkx-k; if (k<kk) kk = k; else kk = -kk;
+			kk *= FTks; // Scale if non-cubic
 	    
-	    int wn = (int) (0.5+sqrt((Real)(ii*ii+jj*jj+kk*kk)));
+			int wn = (int) (0.5+sqrt((Real)(ii*ii+jj*jj+kk*kk)));
 	    
-	    int ccell = (j*FTix+i)*FThkxpo+k;
+			int ccell = (j*FTix+i)*FThkxpo+k;
 	    
-	    // This filters *spherically* based on wavenumber filterWN
-	    if (wn < filterWN[iFilt]) {
-	      filtered_data_c[iVar][ccell].re = local_data_c[iVar][ccell].re;
-	      filtered_data_c[iVar][ccell].im = local_data_c[iVar][ccell].im;
-	      filtered_data_c[iVar+nVars][ccell].re = 0.;
-	      filtered_data_c[iVar+nVars][ccell].im = 0.;
-	    } else {
-	      filtered_data_c[iVar][ccell].re = 0.;
-	      filtered_data_c[iVar][ccell].im = 0.;
-	      filtered_data_c[iVar+nVars][ccell].re = local_data_c[iVar][ccell].re;
-	      filtered_data_c[iVar+nVars][ccell].im = local_data_c[iVar][ccell].im;
-	    }
+			// This filters *spherically* based on wavenumber filterWN
+			if (wn < filterWN[iFilt]) {
+			  filtered_data_c[iVar][ccell].re = local_data_c[iVar][ccell].re;
+			  filtered_data_c[iVar][ccell].im = local_data_c[iVar][ccell].im;
+			  filtered_data_c[iVar+nVars][ccell].re = 0.;
+			  filtered_data_c[iVar+nVars][ccell].im = 0.;
+			} else {
+			  filtered_data_c[iVar][ccell].re = 0.;
+			  filtered_data_c[iVar][ccell].im = 0.;
+			  filtered_data_c[iVar+nVars][ccell].re = local_data_c[iVar][ccell].re;
+			  filtered_data_c[iVar+nVars][ccell].im = local_data_c[iVar][ccell].im;
+			}
 	    
-	  }
-	}
+		  }
+		}
       }
       
     } // iVar
@@ -928,22 +914,23 @@ void filter(MultiFab &mf, Box &probDomain)
       const int   mfkx = hi[2] - lo[2] + 1;
       
       for (int iVar=0; iVar<nOutVars; iVar++) {
+		Real* mf_data = myFab.dataPtr(iVar);
 	
-	Real* mf_data = myFab.dataPtr(iVar);
-	
-	for (int i=0; i<mfix; i++) {
-	  int FTk=i;
-	  for (int j=0; j<mfjx; j++) {
-	    int FTj=j;
-	    for (int k=0; k<mfkx; k++) {
-	      int FTi=k;
-	      int dat_cell=(k*mfjx+j)*mfix+i;
-	      int fft_cell=(FTi*FTjx+FTj)*(2*FThkxpo)+FTk;
-	      // Load into multi fab for output to plot file
-	      mf_data[dat_cell] = filtered_data[iVar][fft_cell] / div;
-	    }
-	  }
-	}
+		for (int i=0; i<mfix; i++) {
+		  int FTk=i;
+
+		  for (int j=0; j<mfjx; j++) {
+			int FTj=j;
+
+			for (int k=0; k<mfkx; k++) {
+			  int FTi=k;
+			  int dat_cell=(k*mfjx+j)*mfix+i;
+			  int fft_cell=(FTi*FTjx+FTj)*(2*FThkxpo)+FTk;
+			  // Load into multi fab for output to plot file
+			  mf_data[dat_cell] = filtered_data[iVar][fft_cell] / div;
+			}
+		  }
+		}
 	
       } // iVar
       
@@ -971,7 +958,7 @@ void filter(MultiFab &mf, Box &probDomain)
     
     if (ParallelDescriptor::IOProcessor())
       if (!amrex::UtilCreateDirectory(pltfile, 0755))
-	amrex::CreateDirectoryFailed(pltfile);
+		amrex::CreateDirectoryFailed(pltfile);
     ParallelDescriptor::Barrier();
     
     std::string HeaderFileName = pltfile + "/Header";
@@ -987,38 +974,54 @@ void filter(MultiFab &mf, Box &probDomain)
       
       // The plot file type
       os << the_plot_file_type << '\n';
+
       // The number of variables
       os << nOutVars << '\n';
+
       // The variable names
       for (int iVar=0; iVar<nVars; iVar++)
-	os << whichVar[iVar] << "gt" << filterWN[iFilt] << '\n';
+		os << whichVar[iVar] << "gt" << filterWN[iFilt] << '\n';
+
       for (int iVar=0; iVar<nVars; iVar++)
-	os << whichVar[iVar] << "lt" << filterWN[iFilt] << '\n';
+		os << whichVar[iVar] << "lt" << filterWN[iFilt] << '\n';
+
       // The number of space dimensions
       os << BL_SPACEDIM << '\n'; 
+
       // Time
       os << Time << '\n'; 
+
       // Finest level
       os << "0" << '\n'; 
+
       // Domain
       for (int i=0; i<BL_SPACEDIM; i++)
-	os << probLo[i] << ' ';
+		os << probLo[i] << ' ';
+
       os << '\n';
+
       for (int i=0; i<BL_SPACEDIM; i++)
-	os << probHi[i] << ' ';
+		os << probHi[i] << ' ';
+
       os << '\n';
+
       // Refinement ratios
       os << '\n';
+
       // Cell sizes
       os << probDomain << ' ';
       os << '\n';
+
       // Time steps
       os << timeSteps << '\n';
+
       // dx
       os << dx << ' ' << dy << ' ' << dz << '\n';
+
       // CoordSys & bndry
       os << "0\n0\n";
     }
+
     //
     // Build the directory to hold the MultiFab at this level.
     // The name is relative to the directory containing the Header file.
@@ -1026,31 +1029,36 @@ void filter(MultiFab &mf, Box &probDomain)
     static const std::string BaseName = "/Cell";
     std::string Level = "Level_0";
     std::string FullPath = pltfile;
+
     if (!FullPath.empty() && FullPath[FullPath.length()-1] != '/')
       FullPath += '/';
+
     FullPath += Level;
+
     if (ParallelDescriptor::IOProcessor())
       if (!amrex::UtilCreateDirectory(FullPath, 0755))
-	amrex::CreateDirectoryFailed(FullPath);
+		amrex::CreateDirectoryFailed(FullPath);
+
     ParallelDescriptor::Barrier();
     
     if (ParallelDescriptor::IOProcessor())
       {
-	std::cout << "      Grids = " << mf.boxArray().size() << std::endl;
+		std::cout << "      Grids = " << mf.boxArray().size() << std::endl;
 	
-	os << 0 << ' ' << mf.boxArray().size() << ' ' << Time << '\n';
-	os << timeSteps << '\n';
+		os << 0 << ' ' << mf.boxArray().size() << ' ' << Time << '\n';
+		os << timeSteps << '\n';
 	
-	for (int i = 0; i < mf.boxArray().size(); ++i)
-	  {
-	    os << probLo[0]    << ' ' << probHi[0] << ' '
-	       << probLo[1]    << ' ' << probHi[1] << ' '
-	       << local_xlo[i] << ' ' << local_xhi[i] << '\n';
-	  }
-	std::string PathNameInHeader = Level;
-	PathNameInHeader += BaseName;
-	os << PathNameInHeader << '\n';
+		for (int i = 0; i < mf.boxArray().size(); ++i)
+		  {
+			os << probLo[0]    << ' ' << probHi[0] << ' '
+			   << probLo[1]    << ' ' << probHi[1] << ' '
+			   << local_xlo[i] << ' ' << local_xhi[i] << '\n';
+		  }
+		std::string PathNameInHeader = Level;
+		PathNameInHeader += BaseName;
+		os << PathNameInHeader << '\n';
       }
+
     //
     // Use the Full pathname when naming the MultiFab.
     //
@@ -1065,5 +1073,3 @@ void filter(MultiFab &mf, Box &probDomain)
   } // iFilt
 
 }
-  
-  
