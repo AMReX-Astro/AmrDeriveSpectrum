@@ -41,7 +41,6 @@
 // density
 // do_filter = 0 or 1
 // filterWN = list of filter wavenumbers
-// finestLevel = finest level to use
 // maxlev = finest level to use
 //
 
@@ -199,229 +198,224 @@ int main (int argc, char* argv[])
 
       int finestLevel = amrData.FinestLevel();
       int finestLevelIn(-1);
-      pp.query("finestLevel",finestLevelIn);
+      pp.query("maxlev",finestLevelIn);
       if (finestLevelIn>=0 && finestLevelIn<finestLevel) {
 		finestLevel=finestLevelIn;
 		if (ParallelDescriptor::IOProcessor())
 		  std::cout << "Using finestLevel = " << finestLevel << std::endl;
       }
 
-    int toLevel(1);
-    pp.query("maxlev", toLevel); 
-    int whichLevel(std::min(toLevel, finestLevel));
-    finestLevel = whichLevel;
+	  Box probDomain(amrData.ProbDomain()[finestLevel]);
 
-    Box probDomain(amrData.ProbDomain()[finestLevel]);
+	  // Set AMReX and FourierTranform array sizes
+	  // Note this defaults to a transposition
+	  BLix = FTkx = probDomain.length(XDIR);
+	  BLjx = FTjx = probDomain.length(YDIR);
+	  BLkx = FTix = probDomain.length(ZDIR);
 
-	// Set AMReX and FourierTranform array sizes
-	// Note this defaults to a transposition
-	BLix = FTkx = probDomain.length(XDIR);
-	BLjx = FTjx = probDomain.length(YDIR);
-	BLkx = FTix = probDomain.length(ZDIR);
+	  // Figure out the maximum length and wavenumber scaling factors for non-cubic domains
+	  FTmx = FTix;
+	  if (FTjx>FTmx) FTmx=FTjx;
+	  if (FTkx>FTmx) FTmx=FTkx;
 
-	// Figure out the maximum length and wavenumber scaling factors for non-cubic domains
-	FTmx = FTix;
-	if (FTjx>FTmx) FTmx=FTjx;
-	if (FTkx>FTmx) FTmx=FTkx;
+	  FTis = FTmx/FTix;
+	  FTjs = FTmx/FTjx;
+	  FTks = FTmx/FTkx;
 
-	FTis = FTmx/FTix;
-	FTjs = FTmx/FTjx;
-	FTks = FTmx/FTkx;
+	  // Half kx+1 - accounts for the fftw padding
+	  FThkxpo = FTkx/2+1;
 
-	// Half kx+1 - accounts for the fftw padding
-	FThkxpo = FTkx/2+1;
+	  // Number of wavenumbers in the spectra
+	  wavenumbers = FTmx/2;
 
-	// Number of wavenumbers in the spectra
-	wavenumbers = FTmx/2;
+	  // Size of correlation functions
+	  Qix = BLix/2;
+	  Qjx = BLjx/2;
+	  Qkx = BLkx/2;
 
-	// Size of correlation functions
-	Qix = BLix/2;
-	Qjx = BLjx/2;
-	Qkx = BLkx/2;
-
-	// Declare memory for spectra (plus one for counting hits)
-	for (int iVar=0; iVar<=nVars; iVar++) {
-	  spectrum[iVar]=(Real*)malloc(sizeof(Real)*wavenumbers);
-	  for (int wn=0; wn<wavenumbers; wn++)
-		spectrum[iVar][wn] = 0.0;
-	}
-
-	if (div_free) {
-	  for (int iVar=0; iVar<nVars; iVar++) {
-		spectrumS[iVar]=(Real*)malloc(sizeof(Real)*wavenumbers);
-		spectrumC[iVar]=(Real*)malloc(sizeof(Real)*wavenumbers);
-		for (int wn=0; wn<wavenumbers; wn++) {
-		  spectrumS[iVar][wn] = 0.0;
-		  spectrumC[iVar][wn] = 0.0;
-		}
+	  // Declare memory for spectra (plus one for counting hits)
+	  for (int iVar=0; iVar<=nVars; iVar++) {
+		spectrum[iVar]=(Real*)malloc(sizeof(Real)*wavenumbers);
+		for (int wn=0; wn<wavenumbers; wn++)
+		  spectrum[iVar][wn] = 0.0;
 	  }
-	}
 
-	// Declare memory for correlation functions
-	// Qx, Qy and Qz are the correlations in the three directions
-	for (int iVar=0; iVar<nVars; iVar++) {
-	  Qx[iVar]=(Real*)malloc(sizeof(Real)*Qix);    for (int i=0; i<Qix; i++)    Qx[iVar][i] = 0.0;
-	  Qy[iVar]=(Real*)malloc(sizeof(Real)*Qjx);    for (int j=0; j<Qjx; j++)    Qy[iVar][j] = 0.0;
-	  Qz[iVar]=(Real*)malloc(sizeof(Real)*Qkx);    for (int k=0; k<Qkx; k++)    Qz[iVar][k] = 0.0;
-	}
-
-	// Other AMReX stuff
-	probLo=amrData.ProbLo();
-	probHi=amrData.ProbHi();
-
-	Lx = probHi[0]-probLo[0];
-	Ly = probHi[0]-probLo[0];
-	Lz = probHi[0]-probLo[0];
-
-	dx = Lx/(Real)BLix;
-	dy = Ly/(Real)BLjx;
-	dz = Lz/(Real)BLkx;
-
-	Real dxyz=dx*dy*dz;
-
-	//
-	// Plan ffts and make boxes, distribution etc.
-	//
-	BoxArray   domainBoxArray(nProcs);
-	Vector<int> pmap(nProcs+1);
-
-	plan_ffts(probDomain,domainBoxArray,pmap);
-
-	DistributionMapping domainDistMap(pmap);
-
-	//
-	// Load plot file into prescribed data structure
-	// 
-	int ngrow(0);
-	MultiFab mf;
-	mf.define(domainBoxArray, domainDistMap, nVars+density_weighting, ngrow, MFInfo().SetAlloc(true));
-
-	Real timer_start = ParallelDescriptor::second();
-
-	amrData.FillVar(mf, finestLevel, whichVar, destFills);
-
-	//
-	// Zero velocity components if density < density_lower_bound
-	//
-	if (use_cutoff_density) {
-
-	  for (MFIter ntmfi(mf); ntmfi.isValid(); ++ntmfi) {
-		Real denTemp;
-		FArrayBox &myFab = mf[ntmfi];
-		int XVEL(0), YVEL(1), ZVEL(2), DEN(3);
-
-		for (int ni(XVEL); ni <= ZVEL; ++ni) {
-
-		  for (int n(0); n < myFab.box().numPts(); ++n) {
-			denTemp = myFab.dataPtr(DEN)[n];
-			if (denTemp < cutoff_density)
-			  myFab.dataPtr(ni)[n] = 0.0;
+	  if (div_free) {
+		for (int iVar=0; iVar<nVars; iVar++) {
+		  spectrumS[iVar]=(Real*)malloc(sizeof(Real)*wavenumbers);
+		  spectrumC[iVar]=(Real*)malloc(sizeof(Real)*wavenumbers);
+		  for (int wn=0; wn<wavenumbers; wn++) {
+			spectrumS[iVar][wn] = 0.0;
+			spectrumC[iVar][wn] = 0.0;
 		  }
 		}
 	  }
-	}
 
-    for (int n=0; n<nVars+density_weighting; n++)
-	  amrData.FlushGrids(amrData.StateNumber(whichVar[n]));
+	  // Declare memory for correlation functions
+	  // Qx, Qy and Qz are the correlations in the three directions
+	  for (int iVar=0; iVar<nVars; iVar++) {
+		Qx[iVar]=(Real*)malloc(sizeof(Real)*Qix);    for (int i=0; i<Qix; i++)    Qx[iVar][i] = 0.0;
+		Qy[iVar]=(Real*)malloc(sizeof(Real)*Qjx);    for (int j=0; j<Qjx; j++)    Qy[iVar][j] = 0.0;
+		Qz[iVar]=(Real*)malloc(sizeof(Real)*Qkx);    for (int k=0; k<Qkx; k++)    Qz[iVar][k] = 0.0;
+	  }
 
-	Real timer_stop = ParallelDescriptor::second();
+	  // Other AMReX stuff
+	  probLo=amrData.ProbLo();
+	  probHi=amrData.ProbHi();
 
-	if (ParallelDescriptor::IOProcessor())
-	  std::cout << "   ...done (" << timer_stop-timer_start << "s)." << std::endl;
+	  Lx = probHi[0]-probLo[0];
+	  Ly = probHi[0]-probLo[0];
+	  Lz = probHi[0]-probLo[0];
 
-	//
-	// Allocate memory for fftw data
-	//
-	for (int iVar=0; iVar<nVars; iVar++) {
-	  local_data[iVar]   = (fftw_real*)    malloc(sizeof(fftw_real) * total_local_size);   if (local_data[iVar] == NULL) amrex::Abort("Malloc fail (local_data)");
-	  local_data_c[iVar] = (fftw_complex*) local_data[iVar];
-	  for (int i=0; i<total_local_size; i++)
-		local_data[iVar][i] = 0.;
-	}
+	  dx = Lx/(Real)BLix;
+	  dy = Ly/(Real)BLjx;
+	  dz = Lz/(Real)BLkx;
+
+	  Real dxyz=dx*dy*dz;
+
+	  //
+	  // Plan ffts and make boxes, distribution etc.
+	  //
+	  BoxArray   domainBoxArray(nProcs);
+	  Vector<int> pmap(nProcs+1);
+
+	  plan_ffts(probDomain,domainBoxArray,pmap);
+
+	  DistributionMapping domainDistMap(pmap);
+
+	  //
+	  // Load plot file into prescribed data structure
+	  // 
+	  int ngrow(0);
+	  MultiFab mf;
+	  mf.define(domainBoxArray, domainDistMap, nVars+density_weighting, ngrow, MFInfo().SetAlloc(true));
+
+	  Real timer_start = ParallelDescriptor::second();
+
+	  amrData.FillVar(mf, finestLevel, whichVar, destFills);
+
+	  //
+	  // Zero velocity components if density < density_lower_bound
+	  //
+	  if (use_cutoff_density) {
+
+		for (MFIter ntmfi(mf); ntmfi.isValid(); ++ntmfi) {
+		  Real denTemp;
+		  FArrayBox &myFab = mf[ntmfi];
+		  int XVEL(0), YVEL(1), ZVEL(2), DEN(3);
+
+		  for (int ni(XVEL); ni <= ZVEL; ++ni) {
+
+			for (int n(0); n < myFab.box().numPts(); ++n) {
+			  denTemp = myFab.dataPtr(DEN)[n];
+			  if (denTemp < cutoff_density)
+				myFab.dataPtr(ni)[n] = 0.0;
+			}
+		  }
+		}
+	  }
+
+	  for (int n=0; n<nVars+density_weighting; n++)
+		amrData.FlushGrids(amrData.StateNumber(whichVar[n]));
+
+	  Real timer_stop = ParallelDescriptor::second();
+
+	  if (ParallelDescriptor::IOProcessor())
+		std::cout << "   ...done (" << timer_stop-timer_start << "s)." << std::endl;
+
+	  //
+	  // Allocate memory for fftw data
+	  //
+	  for (int iVar=0; iVar<nVars; iVar++) {
+		local_data[iVar]   = (fftw_real*)    malloc(sizeof(fftw_real) * total_local_size);   if (local_data[iVar] == NULL) amrex::Abort("Malloc fail (local_data)");
+		local_data_c[iVar] = (fftw_complex*) local_data[iVar];
+		for (int i=0; i<total_local_size; i++)
+		  local_data[iVar][i] = 0.;
+	  }
     
-	//
-	// Evaluate fft
-	//
-	Spectra(mf, probDomain);
+	  //
+	  // Evaluate fft
+	  //
+	  Spectra(mf, probDomain);
 
-	if (ParallelDescriptor::IOProcessor()) {
-	  std::string suffix;
-	  suffix = "";
-	  if (div_free) {
-		if (transpose_dp)
-		  suffix += "_df_tdp";
-		else
-		  suffix += "_df";
-	  }
-	  if (density_weighting)
-		suffix += "_dw";
-	  suffix += ".dat";
-
-	  std::cout << "Outputting to file..." << std::endl;
-	  for (int iVar=0; iVar<=nVars; iVar++) {
-		std::string outfile;
-		if (iVar==nVars)
-		  outfile = infile + "/spectrum_count" + suffix;
-		else
-		  outfile = infile + "/" + whichVar[iVar] + "_spectrum" + suffix;
-		FILE* file=fopen(outfile.c_str(),"w");
-		for (int wn=0; wn<wavenumbers; wn++)
-		  if (div_free)
-			fprintf(file,"%i %e %e %e\n",wn,spectrum[iVar][wn],spectrumS[iVar][wn],spectrumC[iVar][wn]);
+	  if (ParallelDescriptor::IOProcessor()) {
+		std::string suffix;
+		suffix = "";
+		if (div_free) {
+		  if (transpose_dp)
+			suffix += "_df_tdp";
 		  else
-			fprintf(file,"%i %e\n",wn,spectrum[iVar][wn]);
-		fclose(file);
+			suffix += "_df";
+		}
+		if (density_weighting)
+		  suffix += "_dw";
+		suffix += ".dat";
+
+		std::cout << "Outputting to file..." << std::endl;
+		for (int iVar=0; iVar<=nVars; iVar++) {
+		  std::string outfile;
+		  if (iVar==nVars)
+			outfile = infile + "/spectrum_count" + suffix;
+		  else
+			outfile = infile + "/" + whichVar[iVar] + "_spectrum" + suffix;
+		  FILE* file=fopen(outfile.c_str(),"w");
+		  for (int wn=0; wn<wavenumbers; wn++)
+			if (div_free)
+			  fprintf(file,"%i %e %e %e\n",wn,spectrum[iVar][wn],spectrumS[iVar][wn],spectrumC[iVar][wn]);
+			else
+			  fprintf(file,"%i %e\n",wn,spectrum[iVar][wn]);
+		  fclose(file);
+		}
+		for (int iVar=0; iVar<nVars; iVar++) {
+		  std::string outfile;
+		  FILE* file;
+
+		  // Integrals
+		  outfile = infile + "/" + whichVar[iVar] + "_Int" + suffix;
+		  file=fopen(outfile.c_str(),"w");
+		  fprintf(file,"%e %e %e\n",Time,sum[iVar]*dxyz,sum2[iVar]*dxyz);
+		  fclose(file);
+
+		  // Qx
+		  outfile = infile + "/" + whichVar[iVar] + "_Qx" + suffix;
+		  file=fopen(outfile.c_str(),"w");
+		  for (int i=0; i<Qix; i++)
+			fprintf(file,"%e %e\n",dx*(0.5+(Real)i),Qx[iVar][i]);
+		  fclose(file);
+
+		  // Qy
+		  outfile = infile + "/" + whichVar[iVar] + "_Qy" + suffix;
+		  file=fopen(outfile.c_str(),"w");
+		  for (int i=0; i<Qjx; i++)
+			fprintf(file,"%e %e\n",dy*(0.5+(Real)i),Qy[iVar][i]);
+		  fclose(file);
+
+		  // Qz
+		  outfile = infile + "/" + whichVar[iVar] + "_Qz" + suffix;
+		  file=fopen(outfile.c_str(),"w");
+		  for (int i=0; i<Qkx; i++)
+			fprintf(file,"%e %e\n",dz*(0.5+(Real)i),Qz[iVar][i]);
+		  fclose(file);
+		}
+		std::cout << "   ...done." << std::endl;
 	  }
+
+	  rfftwnd_mpi_destroy_plan(plan_real2cplx);
+	  rfftwnd_mpi_destroy_plan(plan_cplx2real);
+
 	  for (int iVar=0; iVar<nVars; iVar++) {
-		std::string outfile;
-		FILE* file;
-
-		// Integrals
-		outfile = infile + "/" + whichVar[iVar] + "_Int" + suffix;
-		file=fopen(outfile.c_str(),"w");
-		fprintf(file,"%e %e %e\n",Time,sum[iVar]*dxyz,sum2[iVar]*dxyz);
-		fclose(file);
-
-		// Qx
-		outfile = infile + "/" + whichVar[iVar] + "_Qx" + suffix;
-		file=fopen(outfile.c_str(),"w");
-		for (int i=0; i<Qix; i++)
-		  fprintf(file,"%e %e\n",dx*(0.5+(Real)i),Qx[iVar][i]);
-		fclose(file);
-
-		// Qy
-		outfile = infile + "/" + whichVar[iVar] + "_Qy" + suffix;
-		file=fopen(outfile.c_str(),"w");
-		for (int i=0; i<Qjx; i++)
-		  fprintf(file,"%e %e\n",dy*(0.5+(Real)i),Qy[iVar][i]);
-		fclose(file);
-
-		// Qz
-		outfile = infile + "/" + whichVar[iVar] + "_Qz" + suffix;
-		file=fopen(outfile.c_str(),"w");
-		for (int i=0; i<Qkx; i++)
-		  fprintf(file,"%e %e\n",dz*(0.5+(Real)i),Qz[iVar][i]);
-		fclose(file);
+		free(local_data[iVar]);
+		free(Qx[iVar]);
+		free(Qy[iVar]);
+		free(Qz[iVar]);
+		free(spectrum[iVar]);
 	  }
-	  std::cout << "   ...done." << std::endl;
-	}
-
-	rfftwnd_mpi_destroy_plan(plan_real2cplx);
-	rfftwnd_mpi_destroy_plan(plan_cplx2real);
-
-	for (int iVar=0; iVar<nVars; iVar++) {
-	  free(local_data[iVar]);
-	  free(Qx[iVar]);
-	  free(Qy[iVar]);
-	  free(Qz[iVar]);
-	  free(spectrum[iVar]);
-	}
-	if (div_free) {
-	  for (int iVar=0; iVar<nVars; iVar++) {
-		free(spectrumS[iVar]);
-		free(spectrumC[iVar]);
+	  if (div_free) {
+		for (int iVar=0; iVar<nVars; iVar++) {
+		  free(spectrumS[iVar]);
+		  free(spectrumC[iVar]);
+		}
 	  }
-	}
 
     } // iPlot
 
