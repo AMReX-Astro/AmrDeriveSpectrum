@@ -20,7 +20,14 @@ transpose_dp = 0
 # Flag sets whether or not to weight by density^(1/3)
 density_weighting = 1
 
+# Density field
 density = density
+
+# Flag sets whether or not to apply cutoff density
+use_cutoff_density = 0
+
+# Cutoff density below which to zero the velocities
+cutoff_density = 0.0
 
 # Flag determining whether or not to read a list of
 # wavenumbers to filter on.
@@ -30,7 +37,4 @@ do_filter = 0
 # filterWN = 0.0 0.0 0.0
 
 # This sets the finest level to do the FFT
-finestLevel = 4
-
-# This also sets the finest level to do the FFT
-maxlevel = 4
+finestLevel = 2
