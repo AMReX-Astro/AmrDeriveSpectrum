@@ -201,9 +201,10 @@ int main (int argc, char* argv[])
       pp.query("maxlev",finestLevelIn);
       if (finestLevelIn>=0 && finestLevelIn<finestLevel) {
 		finestLevel=finestLevelIn;
-		if (ParallelDescriptor::IOProcessor())
-		  std::cout << "Using finestLevel = " << finestLevel << std::endl;
       }
+
+	  if (ParallelDescriptor::IOProcessor())
+		std::cout << "Using finestLevel = " << finestLevel << std::endl;
 
 	  Box probDomain(amrData.ProbDomain()[finestLevel]);
 
