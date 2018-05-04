@@ -41,7 +41,7 @@
 // density
 // do_filter = 0 or 1
 // filterWN = list of filter wavenumbers
-// maxlev = finest level to use
+// finestLevel = finest level to use
 //
 
 int main (int argc, char* argv[])
@@ -198,7 +198,7 @@ int main (int argc, char* argv[])
 
       int finestLevel = amrData.FinestLevel();
       int finestLevelIn(-1);
-      pp.query("maxlev",finestLevelIn);
+      pp.query("finestLevel",finestLevelIn);
       if (finestLevelIn>=0 && finestLevelIn<finestLevel) {
 		finestLevel=finestLevelIn;
       }
