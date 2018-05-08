@@ -1,6 +1,13 @@
+#!/usr/bin/env python
 import math
 import numpy
 import pylab
+import os
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('infile', type=str, help='Name of input plotfile to plot spectra after processing with AmrDeriveSpectrum.')
+args = parser.parse_args()
 
 def getFileParams(filename):
 
@@ -82,23 +89,11 @@ def do_diagnostics():
     #pylab.rc("axes", linewidth=2.0)
     #pylab.rc("lines", markeredgewidth=2.0)
 
-
-
-
-
-    #-------------------------------------------------------------------------
-    # read in the temperature data and store the data in XXXresTempData
-
-    specFile = "all_spectrum.dat"
+    specFile = os.path.join(args.infile, "all_spectrum.dat")
 
     specData = getData(specFile)
 
-    #------------------------------------------------------------------------
-    # plot the initial and final base state density
-    #------------------------------------------------------------------------
-
     Ek = specData[:,1] + specData[:,3] + specData[:,5]
-
 
     # do a crude "fit"
     n = 100
@@ -123,7 +118,7 @@ def do_diagnostics():
     ax.set_yscale('log')
 
     pylab.xlim(1, 5000)
-    pylab.ylim(1.e9,1.e12)
+    #pylab.ylim(1.e9,1.e12)
 
     pylab.xlabel(r"$k$")   #, fontsize=28)
 
@@ -137,7 +132,7 @@ def do_diagnostics():
     f = pylab.gcf()
     f.set_size_inches(6.0,6.0)
 
-    pylab.savefig("spectrum.png")
+    pylab.savefig(os.path.join(args.infile, "spectrum.png"))
 
 
 if __name__== "__main__":
