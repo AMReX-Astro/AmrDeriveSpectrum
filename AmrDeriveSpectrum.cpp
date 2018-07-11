@@ -14,7 +14,7 @@
 #include <AMReX_Utility.H>
 #include <AMReX_VisMF.H>
 
-#include "drfftw_mpi.h" // Machine specific option (i.e. Jagwar)
+#include "rfftw_mpi.h" // Machine specific option (i.e. Jagwar)
 //#include "rfftw_mpi.h"
 
 #include "AmrDeriveSpectrum.H"
@@ -88,9 +88,9 @@ int main (int argc, char* argv[])
 
     nVars=pp.countval("vars");
     if (nVars==0)
-	amrex::Abort("Must specify vars to load");
+        amrex::Abort("Must specify vars to load");
     if (ParallelDescriptor::IOProcessor())
-	std::cout << "nVars = " << nVars << std::endl;
+        std::cout << "nVars = " << nVars << std::endl;
 
     div_free=0;
     pp.query("div_free",div_free);
@@ -327,12 +327,13 @@ int main (int argc, char* argv[])
 	  //
 	  // Allocate memory for fftw data
 	  //
-	  for (int iVar=0; iVar<nVars; iVar++) {
-		local_data[iVar]   = (fftw_real*)    malloc(sizeof(fftw_real) * total_local_size);   if (local_data[iVar] == NULL) amrex::Abort("Malloc fail (local_data)");
-		local_data_c[iVar] = (fftw_complex*) local_data[iVar];
-		for (int i=0; i<total_local_size; i++)
-		  local_data[iVar][i] = 0.;
-	  }
+      for (int iVar=0; iVar<nVars; iVar++) {
+          local_data[iVar]   = (fftw_real*)    malloc(sizeof(fftw_real) * total_local_size);
+          if (local_data[iVar] == NULL) amrex::Abort("Malloc fail (local_data)");
+          local_data_c[iVar] = (fftw_complex*) local_data[iVar];
+          for (int i=0; i<total_local_size; i++)
+              local_data[iVar][i] = 0.;
+      }
     
 	  //
 	  // Evaluate fft
@@ -563,6 +564,7 @@ void Spectra(MultiFab &mf, Box &probDomain)
 		int kk = FTkx-k; if (k<kk) kk = k; else kk = -kk;
 		kk *= FTks; // Scale if non-cubic
 
+        // for binning
 		int wn = (int) (0.5+sqrt((Real)(ii*ii+jj*jj+kk*kk)));
 
 		int ccell = (j*FTix+i)*FThkxpo+k;

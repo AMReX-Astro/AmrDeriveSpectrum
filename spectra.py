@@ -5,9 +5,6 @@ import pylab
 import os
 import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument('infile', type=str, help='Name of input plotfile to plot spectra after processing with AmrDeriveSpectrum.')
-args = parser.parse_args()
 
 def getFileParams(filename):
 
@@ -96,12 +93,12 @@ def do_diagnostics():
     Ek = specData[:,1] + specData[:,3] + specData[:,5]
 
     # do a crude "fit"
-    n = 100
-    k = numpy.arange(1000) + 10
-    Efit = Ek[n]*(specData[n,0]/k)**(5./3.)
+    #n = specData.shape[0] - 1
+    #k = numpy.arange(1000) + 10
+    #Efit = Ek[n]*(specData[n,0]/k)**(5./3.)
 
-    pylab.plot(k, Efit,
-               color="r", ls="--", label=r"$k^{-5/3}$")   #, lw=2)
+    #pylab.plot(k, Efit,
+    #           color="r", ls="--", label=r"$k^{-5/3}$")   #, lw=2)
 
 
     # plot the simulation data
@@ -136,5 +133,9 @@ def do_diagnostics():
 
 
 if __name__== "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('infile', type=str, help='Name of input plotfile to plot spectra after processing with AmrDeriveSpectrum.')
+    args = parser.parse_args()
+
     do_diagnostics()
 

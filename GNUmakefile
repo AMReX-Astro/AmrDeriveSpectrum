@@ -12,7 +12,15 @@
 # - The amrex source code should be available, supplied via AMREX_HOME.
 #
 
-BOXLIB_HOME ?= $(AMREX_HOME)
+#############################################
+
+AMREX_HOME = ../../..
+MPI_HOME = /usr/lib/mpich
+USRLIB = /usr/lib
+
+#############################################
+
+BOXLIB_HOME = $(AMREX_HOME)
 
 BL_NOFAST=TRUE
 
@@ -46,18 +54,15 @@ ifndef AMREX_HOME
  $(error AMREX_HOME is not defined.)
 endif
 
-ifndef FFTW2_HOME
- $(error FFW2_HOME is not defined.)
-endif
 
 ifeq ($(EBASE), AmrDeriveSpectrum)
  INCLUDE_LOCATIONS += $(BOXLIB_HOME)/Src/Amr
  INCLUDE_LOCATIONS += $(MPI_HOME)
- INCLUDE_LOCATIONS += $(FFTW2_HOME)/include
- LIBRARY_LOCATIONS += $(FFTW2_HOME)/lib
+ INCLUDE_LOCATIONS += $(USRLIB)/include
+ LIBRARY_LOCATIONS += $(USRLIB)/lib
  include $(BOXLIB_HOME)/Src/Boundary/Make.package
  include $(BOXLIB_HOME)/Src/Extern/amrdata/Make.package
- LIBRARIES += -ldrfftw_mpi -ldfftw_mpi -ldrfftw -ldfftw
+ LIBRARIES += -lrfftw_mpi -lfftw_mpi -lrfftw -lfftw
 endif
 
 include $(BOXLIB_HOME)/Tools/GNUMake/Make.defs
