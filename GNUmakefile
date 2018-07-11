@@ -14,9 +14,7 @@
 
 #############################################
 
-AMREX_HOME = ../../..
-MPI_HOME = /usr/lib/mpich
-USRLIB = /usr/lib
+AMREX_HOME ?= ../../..
 
 #############################################
 
@@ -46,10 +44,6 @@ BUILDCHEM     = FALSE
 
 HERE = .
 
-ifndef MPI_HOME
- $(error MPI_HOME is not defined.)
-endif
-
 ifndef AMREX_HOME
  $(error AMREX_HOME is not defined.)
 endif
@@ -57,9 +51,6 @@ endif
 
 ifeq ($(EBASE), AmrDeriveSpectrum)
  INCLUDE_LOCATIONS += $(BOXLIB_HOME)/Src/Amr
- INCLUDE_LOCATIONS += $(MPI_HOME)
- INCLUDE_LOCATIONS += $(USRLIB)/include
- LIBRARY_LOCATIONS += $(USRLIB)/lib
  include $(BOXLIB_HOME)/Src/Boundary/Make.package
  include $(BOXLIB_HOME)/Src/Extern/amrdata/Make.package
  LIBRARIES += -lrfftw_mpi -lfftw_mpi -lrfftw -lfftw
