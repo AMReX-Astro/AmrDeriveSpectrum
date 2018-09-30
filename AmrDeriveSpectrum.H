@@ -44,16 +44,29 @@ Vector<std::string> whichVar;
 Real Time;
 int  timeSteps;
 
-int  local_ix, local_i_start;
-int  local_jx_after_transpose, local_j_start_after_transpose;
-int  total_local_size;
+#ifndef FFTW_VERSION_3
+typedef int ptrdiff_t;
+#endif
+
+ptrdiff_t  local_ix, local_i_start;
+ptrdiff_t  local_jx_after_transpose, local_j_start_after_transpose;
+ptrdiff_t  total_local_size;
+
 Vector<Real> local_xlo;
 Vector<Real> local_xhi;
+
+#ifdef FFTW_VERSION_3
+typedef Real fftw_real;
+#endif
 
 Vector<fftw_real*>    local_data;
 Vector<fftw_complex*> local_data_c;
 
-rfftwnd_mpi_plan plan_real2cplx, plan_cplx2real; 
+#ifdef FFTW_VERSION_3
+fftw_plan plan_real2cplx, plan_cplx2real; 
+#else
+rfftwnd_mpi_plan plan_real2cplx, plan_cplx2real;
+#endif
 
 void plan_ffts(Box &probDomain, BoxArray &domainBoxArray, Vector<int> &pmap);
 
@@ -63,3 +76,6 @@ int        do_filter;
 int        nFilters;
 Vector<int> filterWN;
 void       filter(MultiFab &mf, Box &probDomain);
+
+Real* real_part(fftw_complex* cplx);
+Real* imag_part(fftw_complex* cplx);

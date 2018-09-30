@@ -14,8 +14,12 @@
 #include <AMReX_Utility.H>
 #include <AMReX_VisMF.H>
 
-#include "drfftw_mpi.h" // Machine specific option (i.e. Jagwar)
-//#include "rfftw_mpi.h"
+#ifdef FFTW_VERSION_3
+#include "fftw3-mpi.h"
+#else
+//#include "drfftw_mpi.h" // Machine specific option (i.e. Jagwar)
+#include "rfftw_mpi.h"
+#endif
 
 #include "AmrDeriveSpectrum.H"
 
@@ -328,7 +332,8 @@ int main (int argc, char* argv[])
 	  // Allocate memory for fftw data
 	  //
 	  for (int iVar=0; iVar<nVars; iVar++) {
-		local_data[iVar]   = (fftw_real*)    malloc(sizeof(fftw_real) * total_local_size);   if (local_data[iVar] == NULL) amrex::Abort("Malloc fail (local_data)");
+		local_data[iVar]   = (fftw_real*)    malloc(sizeof(fftw_real) * total_local_size);
+        if (local_data[iVar] == NULL) amrex::Abort("Malloc fail (local_data)");
 		local_data_c[iVar] = (fftw_complex*) local_data[iVar];
 		for (int i=0; i<total_local_size; i++)
 		  local_data[iVar][i] = 0.;
@@ -401,8 +406,13 @@ int main (int argc, char* argv[])
 		std::cout << "   ...done." << std::endl;
 	  }
 
+#ifdef FFTW_VERSION_3
+      fftw_destroy_plan(plan_real2cplx);
+      fftw_destroy_plan(plan_cplx2real);
+#else
 	  rfftwnd_mpi_destroy_plan(plan_real2cplx);
 	  rfftwnd_mpi_destroy_plan(plan_cplx2real);
+#endif
 
 	  for (int iVar=0; iVar<nVars; iVar++) {
 		free(local_data[iVar]);
@@ -517,7 +527,11 @@ void Spectra(MultiFab &mf, Box &probDomain)
   timer_start = ParallelDescriptor::second();
 
   for (int iVar=0; iVar<nVars; iVar++)
+#ifdef FFTW_VERSION_3
+    fftw_execute_dft_r2c(plan_real2cplx, local_data[iVar], local_data_c[iVar]);
+#else
 	rfftwnd_mpi(plan_real2cplx, 1, local_data[iVar], NULL, FFTW_TRANSPOSED_ORDER);
+#endif
 
   timer_stop = ParallelDescriptor::second();
 
@@ -569,12 +583,12 @@ void Spectra(MultiFab &mf, Box &probDomain)
 
 		if (div_free && wn<wavenumbers) {
 		  // Extract components of velocity
-		  Real uir = local_data_c[0][ccell].re/div;
-		  Real uii = local_data_c[0][ccell].im/div;
-		  Real ujr = local_data_c[1][ccell].re/div;
-		  Real uji = local_data_c[1][ccell].im/div;
-		  Real ukr = local_data_c[2][ccell].re/div;
-		  Real uki = local_data_c[2][ccell].im/div;
+		  Real uir = *real_part(&local_data_c[0][ccell])/div;
+		  Real uii = *imag_part(&local_data_c[0][ccell])/div;
+		  Real ujr = *real_part(&local_data_c[1][ccell])/div;
+		  Real uji = *imag_part(&local_data_c[1][ccell])/div;
+		  Real ukr = *real_part(&local_data_c[2][ccell])/div;
+		  Real uki = *imag_part(&local_data_c[2][ccell])/div;
 		  // Construct dot product / k2
 		  Real dpii, dpjj, dpkk;
 		  if (transpose_dp) {
@@ -616,14 +630,14 @@ void Spectra(MultiFab &mf, Box &probDomain)
 		}
 
 		for (int iVar=0; iVar<nVars; iVar++) {
-		  Real re = local_data_c[iVar][ccell].re/div;
-		  Real im = local_data_c[iVar][ccell].im/div;
+		  Real re = *real_part(&local_data_c[iVar][ccell])/div;
+          Real im = *imag_part(&local_data_c[iVar][ccell])/div;
 		  Real sq = re*re + im*im;
 		  if (wn<wavenumbers)
 			spectrum[iVar][wn] += 0.5 * sq;
 
-		  re = local_data_c[iVar][ccell].re = sq;
-		  im = local_data_c[iVar][ccell].im = 0.;
+		  re = *real_part(&local_data_c[iVar][ccell]) = sq;
+          im = *imag_part(&local_data_c[iVar][ccell]) = 0.;
 		}
 		// Let's count the number of hits
 		if (wn<wavenumbers)
@@ -655,7 +669,11 @@ void Spectra(MultiFab &mf, Box &probDomain)
   timer_start = ParallelDescriptor::second();
 
   for (int iVar=0; iVar<nVars; iVar++)
+#ifdef FFTW_VERSION_3
+    fftw_execute_dft_c2r(plan_cplx2real, local_data_c[iVar], local_data[iVar]);
+#else
 	rfftwnd_mpi(plan_cplx2real, 1, local_data[iVar], NULL, FFTW_TRANSPOSED_ORDER);
+#endif
 
   timer_stop = ParallelDescriptor::second();
 
@@ -693,9 +711,20 @@ void Spectra(MultiFab &mf, Box &probDomain)
 
 
 
-
 void plan_ffts(Box &probDomain, BoxArray &domainBoxArray, Vector<int> &pmap)
 {
+
+#ifdef FFTW_VERSION_3
+  plan_real2cplx = fftw_mpi_plan_dft_r2c_3d(FTix, FTjx, FTkx,
+                                            local_data[0], local_data_c[0],
+                                            MPI_COMM_WORLD,
+                                            FFTW_ESTIMATE | FFTW_MPI_TRANSPOSED_OUT);
+  
+  plan_cplx2real = fftw_mpi_plan_dft_c2r_3d(FTix, FTjx, FTkx,
+                                            local_data_c[0], local_data[0],
+                                            MPI_COMM_WORLD,
+                                            FFTW_ESTIMATE | FFTW_MPI_TRANSPOSED_IN);
+#else
   plan_real2cplx = rfftw3d_mpi_create_plan(MPI_COMM_WORLD,
 										   FTix, FTjx, FTkx,
 										   FFTW_REAL_TO_COMPLEX,
@@ -705,15 +734,24 @@ void plan_ffts(Box &probDomain, BoxArray &domainBoxArray, Vector<int> &pmap)
 										   FTix, FTjx, FTkx,
 										   FFTW_COMPLEX_TO_REAL,
 										   FFTW_ESTIMATE);
+#endif
+
   //
   // FFTW prescribes the data structure
   //
+#ifdef FFTW_VERSION_3
+  total_local_size = fftw_mpi_local_size_3d_transposed(FTix, FTjx, FThkxpo,
+                                                       MPI_COMM_WORLD,
+                                                       &local_ix, &local_i_start,
+                                                       &local_jx_after_transpose, &local_j_start_after_transpose);
+#else
   rfftwnd_mpi_local_sizes(plan_real2cplx,
 						  &local_ix, &local_i_start,
 						  &local_jx_after_transpose,
 						  &local_j_start_after_transpose,
 						  &total_local_size);
-  
+#endif
+
   if (ParallelDescriptor::IOProcessor())
 	std::cout << "Total_local_size = " << total_local_size << std::endl;
 
@@ -806,7 +844,8 @@ void filter(MultiFab &mf, Box &probDomain)
   Vector<fftw_complex*> filtered_data_c(nFiltVars);
 
   for (int iVar=0; iVar<nFiltVars; iVar++) {
-    filtered_data[iVar]   = (fftw_real*)    malloc(sizeof(fftw_real) * total_local_size);   if (filtered_data[iVar] == NULL) amrex::Abort("Malloc fail (filtered_data)");
+    filtered_data[iVar]   = (fftw_real*)    malloc(sizeof(fftw_real) * total_local_size);
+    if (filtered_data[iVar] == NULL) amrex::Abort("Malloc fail (filtered_data)");
     filtered_data_c[iVar] = (fftw_complex*) filtered_data[iVar];
   }
 
@@ -858,15 +897,15 @@ void filter(MultiFab &mf, Box &probDomain)
 	    
 			// This filters *spherically* based on wavenumber filterWN
 			if (wn < filterWN[iFilt]) {
-			  filtered_data_c[iVar][ccell].re = local_data_c[iVar][ccell].re;
-			  filtered_data_c[iVar][ccell].im = local_data_c[iVar][ccell].im;
-			  filtered_data_c[iVar+nVars][ccell].re = 0.;
-			  filtered_data_c[iVar+nVars][ccell].im = 0.;
+			  *real_part(&filtered_data_c[iVar][ccell]) = *real_part(&local_data_c[iVar][ccell]);
+			  *imag_part(&filtered_data_c[iVar][ccell]) = *imag_part(&local_data_c[iVar][ccell]);
+			  *real_part(&filtered_data_c[iVar+nVars][ccell]) = 0.;
+			  *imag_part(&filtered_data_c[iVar+nVars][ccell]) = 0.;
 			} else {
-			  filtered_data_c[iVar][ccell].re = 0.;
-			  filtered_data_c[iVar][ccell].im = 0.;
-			  filtered_data_c[iVar+nVars][ccell].re = local_data_c[iVar][ccell].re;
-			  filtered_data_c[iVar+nVars][ccell].im = local_data_c[iVar][ccell].im;
+			  *real_part(&filtered_data_c[iVar][ccell]) = 0.;
+			  *imag_part(&filtered_data_c[iVar][ccell]) = 0.;
+			  *real_part(&filtered_data_c[iVar+nVars][ccell]) = *real_part(&local_data_c[iVar][ccell]);
+			  *imag_part(&filtered_data_c[iVar+nVars][ccell]) = *imag_part(&local_data_c[iVar][ccell]);
 			}
 	    
 		  }
@@ -888,7 +927,11 @@ void filter(MultiFab &mf, Box &probDomain)
     timer_start = ParallelDescriptor::second();
     
     for (int iVar=0; iVar<nFiltVars; iVar++)
+#ifdef FFTW_VERSION_3
+      fftw_execute_dft_c2r(plan_cplx2real, filtered_data_c[iVar], filtered_data[iVar]);
+#else
       rfftwnd_mpi(plan_cplx2real, 1, filtered_data[iVar], NULL, FFTW_TRANSPOSED_ORDER);
+#endif
     
     timer_stop = ParallelDescriptor::second();
     
@@ -1076,4 +1119,22 @@ void filter(MultiFab &mf, Box &probDomain)
 
   } // iFilt
 
+}
+
+Real* real_part(fftw_complex* cplx)
+{
+#ifdef FFTW_VERSION_3
+  return cplx[0];
+#else
+  return &(cplx->re);
+#endif
+}
+
+Real* imag_part(fftw_complex* cplx)
+{
+#ifdef FFTW_VERSION_3
+  return cplx[1];
+#else
+  return &(cplx->im);
+#endif
 }

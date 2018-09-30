@@ -38,6 +38,11 @@ BUILDCHEM     = FALSE
 
 HERE = .
 
+# FFTW VERSION
+USE_FFTW3 ?= FALSE
+
+# CHECK ENVIRONMENT VARIABLES
+
 ifndef MPI_HOME
  $(error MPI_HOME is not defined.)
 endif
@@ -46,18 +51,32 @@ ifndef AMREX_HOME
  $(error AMREX_HOME is not defined.)
 endif
 
+ifeq ($(USE_FFTW3), TRUE)
+ifndef FFTW3_HOME
+ $(error FFTW3_HOME is not defined.)
+endif
+DEFINES += -DFFTW_VERSION_3
+else
 ifndef FFTW2_HOME
- $(error FFW2_HOME is not defined.)
+ $(error FFTW2_HOME is not defined.)
+endif
 endif
 
 ifeq ($(EBASE), AmrDeriveSpectrum)
  INCLUDE_LOCATIONS += $(BOXLIB_HOME)/Src/Amr
  INCLUDE_LOCATIONS += $(MPI_HOME)
- INCLUDE_LOCATIONS += $(FFTW2_HOME)/include
- LIBRARY_LOCATIONS += $(FFTW2_HOME)/lib
  include $(BOXLIB_HOME)/Src/Boundary/Make.package
  include $(BOXLIB_HOME)/Src/Extern/amrdata/Make.package
- LIBRARIES += -ldrfftw_mpi -ldfftw_mpi -ldrfftw -ldfftw
+ifeq ($(USE_FFTW3), TRUE)
+ INCLUDE_LOCATIONS += $(FFTW3_HOME)/include
+ LIBRARY_LOCATIONS += $(FFTW3_HOME)/lib
+ LIBRARIES += -lfftw3_mpi -lfftw3
+else
+ INCLUDE_LOCATIONS += $(FFTW2_HOME)/include
+ LIBRARY_LOCATIONS += $(FFTW2_HOME)/lib
+# LIBRARIES += -ldrfftw_mpi -ldfftw_mpi -ldrfftw -ldfftw
+ LIBRARIES += -lrfftw_mpi -lfftw_mpi -lrfftw -lfftw
+endif
 endif
 
 include $(BOXLIB_HOME)/Tools/GNUMake/Make.defs
