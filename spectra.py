@@ -1,9 +1,13 @@
 #!/usr/bin/env python
 import math
 import numpy
-import pylab
 import os
 import argparse
+import matplotlib
+
+matplotlib.use('Agg')
+
+import pylab
 
 parser = argparse.ArgumentParser()
 parser.add_argument('infile', type=str, help='Name of input plotfile to plot spectra after processing with AmrDeriveSpectrum.')
