@@ -44,13 +44,17 @@ Vector<std::string> whichVar;
 Real Time;
 int  timeSteps;
 
-#ifndef FFTW_VERSION_3
-typedef int ptrdiff_t;
+
+
+#ifdef FFTW_VERSION_3
+typedef ptrdiff_t local_index_t;
+#else
+typedef int local_index_t;
 #endif
 
-ptrdiff_t  local_ix, local_i_start;
-ptrdiff_t  local_jx_after_transpose, local_j_start_after_transpose;
-ptrdiff_t  total_local_size;
+local_index_t  local_ix, local_i_start;
+local_index_t  local_jx_after_transpose, local_j_start_after_transpose;
+local_index_t  total_local_size;
 
 Vector<Real> local_xlo;
 Vector<Real> local_xhi;
