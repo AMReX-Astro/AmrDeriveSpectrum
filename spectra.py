@@ -1,12 +1,20 @@
 #!/usr/bin/env python
 import math
 import numpy
-import pylab
+
+import matplotlib
+matplotlib.use("Agg")
+
+from cycler import cycler
+import matplotlib.pyplot as plt
 import os
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('infile', type=str, help='Name of input plotfile to plot spectra after processing with AmrDeriveSpectrum.')
+parser.add_argument('infiles', type=str, nargs='+', help='Name of input spectra datfiles to plot spectra after processing with AmrDeriveSpectrum.')
+parser.add_argument('-c', '--colors', type=str, nargs='+', help='Sequence of colors for plotting multiple spectra files.')
+parser.add_argument('-l', '--legend', type=str, nargs='+', help='Sequence of legend titles for plotting multiple spectra files.')
+parser.add_argument('-emax', '--fit_energy_maximum', action='store_true', help='Do approximate fits to the Kolmogorov scaling using the energy maximum.')
 args = parser.parse_args()
 
 def getFileParams(filename):
@@ -36,7 +44,7 @@ def getFileParams(filename):
             elif (time > oldTime):
                 oldTime = time
                 numLines +=1
-            
+
     mf.close()
 
     return numLines, numFields
@@ -73,68 +81,79 @@ def getData(filename):
                 data[indexLine,:] = fields
                 oldTime = time
                 indexLine +=1
-            
+
     mf.close()
 
     return data
 
 
 def do_diagnostics():
+    # setup plotting
+    if args.colors:
+        plots_cycler = (cycler(color=args.colors) * cycler(linestyle=['-', '--']))
+    else:
+        plots_cycler = (cycler(color=['b', 'g', 'r', 'c', 'm', 'k']) * cycler(linestyle=['-', '--']))
 
-    # resizing
-    #pylab.rcParams.update({'xtick.labelsize': 20, 
-    #                       'ytick.labelsize': 20,
-    #                       'text.fontsize': 20})
+    fig = plt.figure()
+    # fig.set_figheight(6.0)
+    # fig.set_figwidth(8.0)
+    ax = fig.add_subplot(111)
+    ax.set_prop_cycle(plots_cycler)
 
-    #pylab.rc("axes", linewidth=2.0)
-    #pylab.rc("lines", markeredgewidth=2.0)
+    # read data
+    for i, infile in enumerate(args.infiles):
+        specFile = infile
 
-    specFile = os.path.join(args.infile, "all_spectrum.dat")
+        specData = getData(specFile)
 
-    specData = getData(specFile)
+        Ek = specData[:,1] + specData[:,3] + specData[:,5]
 
-    Ek = specData[:,1] + specData[:,3] + specData[:,5]
+        # plot the simulation data
+        if args.legend:
+            try:
+                label = args.legend[i]
+                fit_label = label + ", " + r"$k^{-5/3}$"
+            except:
+                label = r"spectrum"
+                fit_label = r"$k^{-5/3}$"
+        else:
+            label = r"spectrum"
+            fit_label = r"$k^{-5/3}$"
 
-    # do a crude "fit"
-    n = 100
-    k = numpy.arange(1000) + 10
-    Efit = Ek[n]*(specData[n,0]/k)**(5./3.)
+        ax.plot(specData[:,0], Ek, label=label)
 
-    pylab.plot(k, Efit,
-               color="r", ls="--", label=r"$k^{-5/3}$")   #, lw=2)
+        if args.fit_energy_maximum:
+            # do a crude "fit" using the energy maximum
+            n = numpy.argmax(Ek)
+        else:
+            n = 10
+        k = numpy.arange(1000) + 10
+        Efit = Ek[n]*(specData[n,0]/k)**(5./3.)
 
-
-    # plot the simulation data
-    pylab.plot(specData[:,0], Ek,
-               color="k", label=r"spectrum")   #, lw=2)
+        ax.plot(k, Efit, label=fit_label, alpha=0.5)
 
 
     # axis stuff
-    ax = pylab.gca()
-    ax.xaxis.set_major_formatter(pylab.ScalarFormatter(useMathText=True))
-    ax.yaxis.set_major_formatter(pylab.ScalarFormatter(useMathText=True))
-    
     ax.set_xscale('log')
     ax.set_yscale('log')
 
-    pylab.xlim(1, 5000)
-    #pylab.ylim(1.e9,1.e12)
+    ax.set_xlim(1, 5000)
+    #ax.set_ylim(1.e9,1.e12)
 
-    pylab.xlabel(r"$k$")   #, fontsize=28)
+    ax.set_xlabel(r"$k$")
 
-    pylab.ylabel(r"$E(k)$")   #, fontsize=28)
+    ax.set_ylabel(r"$E(k)$")
 
-    leg = pylab.legend(loc=1)
+    leg = ax.legend(loc=1)
     ltext = leg.get_texts()
-    pylab.setp(ltext, fontsize=12)
+    # plt.setp(ltext, fontsize=12)
     leg.draw_frame(0)
 
-    f = pylab.gcf()
-    f.set_size_inches(6.0,6.0)
+    plt.tight_layout()
 
-    pylab.savefig(os.path.join(args.infile, "spectrum.png"))
+    plt.savefig("spectrum.png", dpi=300)
+    plt.savefig("spectrum.eps")
 
 
 if __name__== "__main__":
     do_diagnostics()
-
