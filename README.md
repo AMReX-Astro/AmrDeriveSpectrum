@@ -26,10 +26,17 @@ $ make DIM=3 AMREX_HOME=[path-to-amrex] FFTW2_HOME=[path-to-fftw2] MPI_HOME=[pat
 ## Running
 
 The following example uses AmrDeriveSpectrum to calculate the kinetic
-energy spectrum from a MAESTRO plotfile:
+energy spectrum from a MAESTRO plotfile.
+
+AmrDeriveSpectrum will store the calculated spectra in text files with
+the `.dat` extension inside each plotfile it processes.
+
+To get the kinetic energy power spectrum we combine the power spectra
+for (x,y,z) velocity components as follows:
 
 ```
 $ ./AmrDeriveSpectrum3d.gnu.MPI.ex input_spectrum3d
+$ cd [plotfile]
 $ paste -d ' ' x_vel_spectrum_dw.dat y_vel_spectrum_dw.dat z_vel_spectrum_dw.dat > all_spectrum.dat
 $ python spectra.py
 ```
