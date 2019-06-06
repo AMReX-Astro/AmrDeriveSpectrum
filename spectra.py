@@ -11,10 +11,10 @@ import os
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('infiles', type=str, nargs='+', help='Name of input spectra datfiles to plot spectra after processing with AmrDeriveSpectrum.')
+parser.add_argument('infiles', type=str, nargs='+', help='Name of input spectra .dat files to plot on the same figure after processing with AmrDeriveSpectrum.')
 parser.add_argument('-c', '--colors', type=str, nargs='+', help='Sequence of colors for plotting multiple spectra files.')
 parser.add_argument('-l', '--legend', type=str, nargs='+', help='Sequence of legend titles for plotting multiple spectra files.')
-parser.add_argument('-emax', '--fit_energy_maximum', action='store_true', help='Do approximate fits to the Kolmogorov scaling using the energy maximum.')
+parser.add_argument('-k', '--show_kolmogorov', action='store_true', help='Overplot the Kolmogorov scaling relation intersecting the energy maximum.')
 args = parser.parse_args()
 
 def getFileParams(filename):
@@ -122,7 +122,7 @@ def do_diagnostics():
 
         ax.plot(specData[:,0], Ek, label=label)
 
-        if args.fit_energy_maximum:
+        if args.show_kolmogorov:
             # do a crude "fit" using the energy maximum
             n = numpy.argmax(Ek)
         else:
